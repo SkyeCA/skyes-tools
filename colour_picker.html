@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colour Picker — Pixel Inspector</title>
+<style>
+  :root{
+    --bg: #f4f5f7;
+    --panel-bg: #ffffff;
+    --border: #d8dade;
+    --text: #1c1e21;
+    --muted: #6b7078;
+    --accent: #2b5cff;
+    --accent-hover: #1f47d6;
+    --section-bg: #fafbfc;
+    --input-bg: #ffffff;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+  }
+  h1{
+    font-size: 15px;
+    margin: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  h1 .sub{ font-weight:400; color:var(--muted); font-size:12px; }
+
+  .layout{
+    display:flex;
+    height: calc(100% - 49px);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .panel{
+    width: 340px;
+    min-width: 340px;
+    overflow-y: auto;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 10px 14px 40px;
+  }
+  details{
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  details > summary{
+    cursor: pointer;
+    padding: 9px 12px;
+    font-weight: 600;
+    font-size: 12.5px;
+    list-style: none;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    user-select:none;
+    color: var(--text);
+  }
+  details > summary::-webkit-details-marker{ display:none; }
+  details > summary::after{
+    content: "▸";
+    color: var(--muted);
+    transition: transform .15s;
+    font-size: 11px;
+  }
+  details[open] > summary::after{ transform: rotate(90deg); }
+  .section-body{
+    padding: 8px 12px 12px;
+    display:flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .row label{
+    flex: 1 1 auto;
+    color: var(--text);
+    font-size: 12.5px;
+  }
+  input[type=range]{
+    width: 150px; accent-color: var(--accent);
+  }
+  .note{
+    font-size: 11px;
+    color: var(--muted);
+    line-height:1.5;
+    padding: 2px 2px 0;
+  }
+  button{
+    font-family: inherit;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:hover{ background: #f0f1f3; }
+  button.primary{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  button.primary:hover{ background: var(--accent-hover); }
+
+  /* ---------- Picked colour panel ---------- */
+  .swatch-row{
+    display:flex;
+    align-items:center;
+    gap: 12px;
+  }
+  .swatch{
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+    background-color: #fff;
+    background-image:
+      linear-gradient(45deg, #d8dade 25%, transparent 25%),
+      linear-gradient(-45deg, #d8dade 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #d8dade 75%),
+      linear-gradient(-45deg, transparent 75%, #d8dade 75%);
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0px;
+  }
+  .swatch-hint{
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  .value-row{
+    display:flex;
+    align-items:center;
+    gap: 6px;
+  }
+  .value-row label{
+    width: 34px;
+    flex-shrink: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  .value-row input[type=text]{
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12.5px;
+  }
+  .copybtn{
+    padding: 6px 10px;
+    font-size: 11.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .copybtn.copied{
+    background: #e4f7ea;
+    border-color: #9bd8ae;
+    color: #1e7a3d;
+  }
+
+  /* ---------- Main / image area ---------- */
+  .canvas-area{
+    flex: 1;
+    display:flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    padding: 10px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .toolbar .spacer{ flex:1; }
+  .toolbar .dims{
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .preview-scroll{
+    flex: 1;
+    overflow: auto;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding: 40px 20px;
+    background:
+      linear-gradient(45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(-45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e9eaee 75%),
+      linear-gradient(-45deg, transparent 75%, #e9eaee 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #f0f1f3;
+    position: relative;
+  }
+  .preview-scroll.dragover::after{
+    content: "Drop image to open";
+    position: absolute;
+    inset: 12px;
+    border: 2px dashed var(--accent);
+    border-radius: 10px;
+    background: rgba(43,92,255,0.06);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  #imageWrap{
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+  }
+  #imgCanvas{
+    display:block;
+    box-shadow: 0 2px 14px rgba(0,0,0,.18);
+    background: #fff;
+    cursor: crosshair;
+  }
+  #imgCanvas.hidden{ display:none; }
+
+  .empty-state{
+    color: var(--muted);
+    font-size: 14px;
+    text-align:center;
+    padding: 80px 30px;
+    max-width: 360px;
+  }
+  .empty-state .big{ font-size: 34px; margin-bottom: 10px; }
+
+  .marker{
+    position:absolute;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5px #000, 0 1px 5px rgba(0,0,0,.45);
+    pointer-events:none;
+    display:none;
+  }
+
+  /* ---------- Magnifier (fixed, follows cursor) ---------- */
+  .magnifier{
+    position: fixed;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #fff;
+    box-shadow: 0 3px 16px rgba(0,0,0,.4), 0 0 0 1px rgba(0,0,0,.15);
+    pointer-events:none;
+    display:none;
+    z-index: 1000;
+  }
+  .magnifier canvas{
+    display:block;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+  }
+  .mag-crosshair-h, .mag-crosshair-v{
+    position:absolute;
+    background: rgba(255,20,20,.9);
+    pointer-events:none;
+  }
+  .mag-crosshair-h{ left:0; right:0; height:1px; top:50%; }
+  .mag-crosshair-v{ top:0; bottom:0; width:1px; left:50%; }
+  .mag-center-ring{
+    position:absolute;
+    left:50%; top:50%;
+    width: 10px; height:10px;
+    margin: -5px 0 0 -5px;
+    border: 1px solid rgba(255,255,255,.9);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0,0,0,.5);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+
+<h1>Colour Picker <span class="sub">— open an image, magnify, click a pixel to read its colour</span></h1>
+
+<div class="layout">
+  <aside class="panel" id="panel">
+
+    <details open>
+      <summary>Open Image</summary>
+      <div class="section-body">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="primary" id="btnOpenImage">Open Image…</button>
+          <input type="file" id="f_imageFile" accept="image/*" style="display:none">
+        </div>
+        <div class="note">Nothing is uploaded, the image stays in your browser. You can also drag &amp; drop a file onto the image area.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Picked Colour</summary>
+      <div class="section-body">
+        <div class="swatch-row">
+          <div class="swatch" id="swatch"></div>
+          <div class="swatch-hint" id="swatchHint">Click a pixel on the image to pick its colour.</div>
+        </div>
+
+        <div class="value-row">
+          <label for="valHex">HEX</label>
+          <input type="text" id="valHex" readonly value="">
+          <button class="copybtn" data-copy="valHex">Copy</button>
+        </div>
+        <div class="value-row">
+          <label for="valRgb">RGB</label>
+          <input type="text" id="valRgb" readonly value="">
+          <button class="copybtn" data-copy="valRgb">Copy</button>
+        </div>
+        <div class="value-row">
+          <label for="valHsv">HSV</label>
+          <input type="text" id="valHsv" readonly value="">
+          <button class="copybtn" data-copy="valHsv">Copy</button>
+        </div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Magnifier</summary>
+      <div class="section-body">
+        <div class="row"><label for="f_zoomLevel">Zoom level</label><input type="range" id="f_zoomLevel" min="4" max="20" step="1" value="8"></div>
+        <div class="note" id="zoomReadout"></div>
+      </div>
+    </details>
+
+  </aside>
+
+  <main class="canvas-area">
+    <div class="toolbar">
+      <div class="dims" id="dimsLabel">No image loaded</div>
+      <div class="spacer"></div>
+      <div class="dims" id="hoverLabel"></div>
+    </div>
+    <div class="preview-scroll" id="previewScroll">
+      <div id="imageWrap">
+        <canvas id="imgCanvas" class="hidden"></canvas>
+        <div class="marker" id="marker"></div>
+      </div>
+      <div class="empty-state" id="emptyState">
+        <div class="big">📂</div>
+        <div>Open an image (or drag one in) to start picking colours.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="magnifier" id="magnifier">
+  <canvas id="magCanvas" width="180" height="180"></canvas>
+  <div class="mag-crosshair-h"></div>
+  <div class="mag-crosshair-v"></div>
+  <div class="mag-center-ring"></div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const MAG_SIZE = 180; // magnifier diameter in CSS px, matches canvas width/height attrs
+
+  const imgCanvas = document.getElementById("imgCanvas");
+  const imgCtx = imgCanvas.getContext("2d", { willReadFrequently: true });
+  const magCanvas = document.getElementById("magCanvas");
+  const magCtx = magCanvas.getContext("2d", { willReadFrequently: true });
+  const magnifierEl = document.getElementById("magnifier");
+  const markerEl = document.getElementById("marker");
+  const imageWrap = document.getElementById("imageWrap");
+  const previewScroll = document.getElementById("previewScroll");
+  const emptyState = document.getElementById("emptyState");
+  const dimsLabel = document.getElementById("dimsLabel");
+  const hoverLabel = document.getElementById("hoverLabel");
+  const zoomLevelEl = document.getElementById("f_zoomLevel");
+  const zoomReadout = document.getElementById("zoomReadout");
+  const swatch = document.getElementById("swatch");
+  const swatchHint = document.getElementById("swatchHint");
+  const valHex = document.getElementById("valHex");
+  const valRgb = document.getElementById("valRgb");
+  const valHsv = document.getElementById("valHsv");
+  const fileInput = document.getElementById("f_imageFile");
+  const btnOpenImage = document.getElementById("btnOpenImage");
+
+  let naturalW = 0, naturalH = 0;
+  let hasImage = false;
+  let lastPicked = null; // {px,py}
+  let zoom = parseInt(zoomLevelEl.value, 10);
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  function rgbToHex(r, g, b){
+    return "#" + [r, g, b].map(x => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+  }
+
+  function rgbToHsv(r, g, b){
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if(d !== 0){
+      if(max === r) h = ((g - b) / d) % 6;
+      else if(max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+      if(h < 0) h += 360;
+    }
+    const s = max === 0 ? 0 : d / max;
+    const v = max;
+    return { h: Math.round(h), s: Math.round(s * 100), v: Math.round(v * 100) };
+  }
+
+  function updateZoomReadout(){
+    const cells = MAG_SIZE / zoom;
+    zoomReadout.textContent = `${zoom}× magnification — showing ~${Math.round(cells)}×${Math.round(cells)} source pixels`;
+  }
+
+  // ---------- Image loading ----------
+  function loadImageFile(file){
+    if(!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        naturalW = img.naturalWidth;
+        naturalH = img.naturalHeight;
+        imgCanvas.width = naturalW;
+        imgCanvas.height = naturalH;
+        imgCtx.drawImage(img, 0, 0);
+        hasImage = true;
+        imgCanvas.classList.remove("hidden");
+        emptyState.style.display = "none";
+        dimsLabel.textContent = `${naturalW} × ${naturalH}px — ${file.name}`;
+        resizeCanvasDisplay();
+        lastPicked = null;
+        markerEl.style.display = "none";
+      };
+      img.onerror = () => {
+        dimsLabel.textContent = "Couldn't load that file as an image.";
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resizeCanvasDisplay(){
+    if(!hasImage) return;
+    const containerW = Math.max(200, previewScroll.clientWidth - 80);
+    const containerH = Math.max(200, previewScroll.clientHeight - 80);
+    let dispW = naturalW;
+    // Upscale small images so individual pixels are easy to target.
+    if(dispW < 300) dispW = 300;
+    // Downscale large images to fit the viewport.
+    const maxByW = containerW;
+    const maxByH = containerH * (naturalW / naturalH);
+    const maxAllowed = Math.min(maxByW, maxByH);
+    if(dispW > maxAllowed) dispW = Math.max(1, maxAllowed);
+
+    imgCanvas.style.width = dispW + "px";
+    imgCanvas.style.height = (dispW / naturalW * naturalH) + "px";
+    imgCanvas.style.imageRendering = dispW > naturalW ? "pixelated" : "auto";
+
+    if(lastPicked) placeMarker(lastPicked.px, lastPicked.py);
+  }
+
+  // ---------- Coordinate helpers ----------
+  function eventToPixel(e){
+    const rect = imgCanvas.getBoundingClientRect();
+    const scaleX = imgCanvas.width / rect.width;
+    const scaleY = imgCanvas.height / rect.height;
+    const x = Math.floor((e.clientX - rect.left) * scaleX);
+    const y = Math.floor((e.clientY - rect.top) * scaleY);
+    return { x, y, rect };
+  }
+
+  function pixelInBounds(x, y){
+    return x >= 0 && y >= 0 && x < imgCanvas.width && y < imgCanvas.height;
+  }
+
+  function readPixel(px, py){
+    const data = imgCtx.getImageData(px, py, 1, 1).data;
+    return { r: data[0], g: data[1], b: data[2] };
+  }
+
+  // ---------- Magnifier ----------
+  function updateMagnifier(px, py){
+    const cells = MAG_SIZE / zoom;
+    const scale = MAG_SIZE / cells;
+    const half = cells / 2;
+    const realSx = px - half;
+    const realSy = py - half;
+
+    magCtx.clearRect(0, 0, MAG_SIZE, MAG_SIZE);
+    magCtx.fillStyle = "#e9eaee";
+    magCtx.fillRect(0, 0, MAG_SIZE, MAG_SIZE);
+
+    const sx = Math.max(0, realSx);
+    const sy = Math.max(0, realSy);
+    const sxEnd = Math.min(naturalW, realSx + cells);
+    const syEnd = Math.min(naturalH, realSy + cells);
+    const sw = sxEnd - sx;
+    const sh = syEnd - sy;
+
+    if(sw > 0 && sh > 0){
+      const dx = (sx - realSx) * scale;
+      const dy = (sy - realSy) * scale;
+      magCtx.imageSmoothingEnabled = false;
+      magCtx.drawImage(imgCanvas, sx, sy, sw, sh, dx, dy, sw * scale, sh * scale);
+    }
+  }
+
+  function positionMagnifier(clientX, clientY){
+    const margin = 8;
+    let left = clientX + 24;
+    let top = clientY + 24;
+    if(left + MAG_SIZE > window.innerWidth - margin) left = clientX - MAG_SIZE - 24;
+    if(top + MAG_SIZE > window.innerHeight - margin) top = clientY - MAG_SIZE - 24;
+    left = clamp(left, margin, window.innerWidth - MAG_SIZE - margin);
+    top = clamp(top, margin, window.innerHeight - MAG_SIZE - margin);
+    magnifierEl.style.left = left + "px";
+    magnifierEl.style.top = top + "px";
+  }
+
+  // ---------- Marker ----------
+  function placeMarker(px, py){
+    const rect = imgCanvas.getBoundingClientRect();
+    const dispX = (px + 0.5) / imgCanvas.width * rect.width;
+    const dispY = (py + 0.5) / imgCanvas.height * rect.height;
+    markerEl.style.left = dispX + "px";
+    markerEl.style.top = dispY + "px";
+    markerEl.style.display = "block";
+  }
+
+  // ---------- Pick / hover output ----------
+  function updateHoverLabel(px, py, rgb){
+    hoverLabel.textContent = `(${px}, ${py})  rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`;
+  }
+
+  function pickColor(px, py){
+    const { r, g, b } = readPixel(px, py);
+    const hex = rgbToHex(r, g, b);
+    const hsv = rgbToHsv(r, g, b);
+
+    swatch.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+    swatch.style.backgroundImage = "none";
+    swatchHint.textContent = `Picked at (${px}, ${py})`;
+
+    valHex.value = hex;
+    valRgb.value = `rgb(${r}, ${g}, ${b})`;
+    valHsv.value = `hsv(${hsv.h}, ${hsv.s}%, ${hsv.v}%)`;
+
+    lastPicked = { px, py };
+    placeMarker(px, py);
+  }
+
+  // ---------- Clipboard ----------
+  function flashCopied(btn){
+    const original = btn.textContent;
+    btn.textContent = "Copied!";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      btn.textContent = original;
+      btn.classList.remove("copied");
+    }, 1100);
+  }
+
+  function copyToClipboard(text, btn){
+    function fallback(){
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand("copy"); flashCopied(btn); }
+      catch(err){ /* clipboard unavailable; value remains selectable in the input */ }
+      document.body.removeChild(ta);
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(() => flashCopied(btn)).catch(fallback);
+    } else {
+      fallback();
+    }
+  }
+
+  // ---------- Events ----------
+  btnOpenImage.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if(fileInput.files && fileInput.files[0]) loadImageFile(fileInput.files[0]);
+    fileInput.value = "";
+  });
+
+  ["dragover", "dragenter"].forEach(evt => {
+    previewScroll.addEventListener(evt, (e) => {
+      e.preventDefault();
+      previewScroll.classList.add("dragover");
+    });
+  });
+  ["dragleave", "dragend"].forEach(evt => {
+    previewScroll.addEventListener(evt, () => previewScroll.classList.remove("dragover"));
+  });
+  previewScroll.addEventListener("drop", (e) => {
+    e.preventDefault();
+    previewScroll.classList.remove("dragover");
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) loadImageFile(e.dataTransfer.files[0]);
+  });
+
+  imgCanvas.addEventListener("mousemove", (e) => {
+    if(!hasImage) return;
+    const { x, y } = eventToPixel(e);
+    if(!pixelInBounds(x, y)){
+      magnifierEl.style.display = "none";
+      return;
+    }
+    updateMagnifier(x, y);
+    positionMagnifier(e.clientX, e.clientY);
+    magnifierEl.style.display = "block";
+    updateHoverLabel(x, y, readPixel(x, y));
+  });
+
+  imgCanvas.addEventListener("mouseleave", () => {
+    magnifierEl.style.display = "none";
+    hoverLabel.textContent = "";
+  });
+
+  imgCanvas.addEventListener("click", (e) => {
+    if(!hasImage) return;
+    const { x, y } = eventToPixel(e);
+    if(!pixelInBounds(x, y)) return;
+    pickColor(x, y);
+  });
+
+  document.querySelectorAll(".copybtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const src = document.getElementById(btn.getAttribute("data-copy"));
+      if(src && src.value) copyToClipboard(src.value, btn);
+    });
+  });
+
+  zoomLevelEl.addEventListener("input", () => {
+    zoom = parseInt(zoomLevelEl.value, 10);
+    updateZoomReadout();
+  });
+
+  window.addEventListener("resize", resizeCanvasDisplay);
+
+  updateZoomReadout();
+})();
+</script>
+</body>
+</html>

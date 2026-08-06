@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4chan Image Converter</title>
+<style>
+  :root{
+    --bg: #f4f5f7;
+    --panel-bg: #ffffff;
+    --border: #d8dade;
+    --text: #1c1e21;
+    --muted: #6b7078;
+    --accent: #2b5cff;
+    --accent-hover: #1f47d6;
+    --section-bg: #fafbfc;
+    --input-bg: #ffffff;
+    --ok: #1a7f37;
+    --warn: #b5750a;
+    --bad: #c22b2b;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+  }
+  h1{
+    font-size: 15px;
+    margin: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  h1 .sub{ font-weight:400; color:var(--muted); font-size:12px; }
+
+  .layout{
+    display:flex;
+    height: calc(100% - 49px);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .panel{
+    width: 320px;
+    min-width: 320px;
+    overflow-y: auto;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 10px 14px 40px;
+  }
+  details{
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  details > summary{
+    cursor: pointer;
+    padding: 9px 12px;
+    font-weight: 600;
+    font-size: 12.5px;
+    list-style: none;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    user-select:none;
+    color: var(--text);
+  }
+  details > summary::-webkit-details-marker{ display:none; }
+  details > summary::after{
+    content: "▸";
+    color: var(--muted);
+    transition: transform .15s;
+    font-size: 11px;
+  }
+  details[open] > summary::after{ transform: rotate(90deg); }
+  .section-body{
+    padding: 8px 12px 12px;
+    display:flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .row label{
+    flex: 1 1 auto;
+    color: var(--text);
+    font-size: 12.5px;
+  }
+  input[type=number]{
+    width: 90px;
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+  }
+  .note{
+    font-size: 11px;
+    color: var(--muted);
+    line-height:1.5;
+    padding: 2px 2px 0;
+  }
+  .readout{
+    background: #eef1ff;
+    border: 1px dashed #b9c4ff;
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 11.5px;
+    color: #2b3a8f;
+    line-height: 1.6;
+    white-space: pre-line;
+    word-break: break-word;
+  }
+  .readout.warn{ background:#fff6e6; border-color:#f0cf8a; color:#7a5300; }
+  .readout.bad{ background:#fdecec; border-color:#f0a3a3; color:#7a1f1f; }
+  button{
+    font-family: inherit;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:hover{ background: #f0f1f3; }
+  button.primary{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    width: 100%;
+  }
+  button.primary:hover{ background: var(--accent-hover); }
+  button:disabled, button.primary:disabled{
+    opacity: .5;
+    cursor: not-allowed;
+    background: #fff;
+    color: var(--muted);
+    border-color: var(--border);
+  }
+
+  /* ---------- Main / preview area ---------- */
+  .canvas-area{
+    flex: 1;
+    display:flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    padding: 10px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .toolbar .spacer{ flex:1; }
+  .toolbar .dims{
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .toolbar .result-pill{
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .toolbar .result-pill.ok{ background:#eaf7ee; border-color:#bfe6ca; color: var(--ok); }
+  .toolbar .result-pill.bad{ background:#fdecec; border-color:#f0a3a3; color: var(--bad); }
+  .preview-scroll{
+    flex: 1;
+    overflow: auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 24px;
+    background:
+      linear-gradient(45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(-45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e9eaee 75%),
+      linear-gradient(-45deg, transparent 75%, #e9eaee 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #f0f1f3;
+    position: relative;
+  }
+  .preview-scroll.dragover::after{
+    content: "Drop image to open";
+    position: absolute;
+    inset: 16px;
+    border: 2px dashed var(--accent);
+    border-radius: 10px;
+    background: rgba(43,92,255,0.06);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  #previewImg{
+    max-width: 100%;
+    max-height: 100%;
+    display:block;
+    box-shadow: 0 2px 14px rgba(0,0,0,.18);
+    background: #fff;
+  }
+  #previewImg.hidden{ display:none; }
+
+  .empty-state{
+    color: var(--muted);
+    font-size: 14px;
+    text-align:center;
+    padding: 20px 30px;
+    max-width: 380px;
+  }
+  .empty-state .big{ font-size: 30px; margin-bottom: 8px; }
+
+  .badge{
+    display:inline-block;
+    font-size:10.5px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.03em;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    position:absolute;
+    top: 14px;
+    left: 14px;
+  }
+</style>
+</head>
+<body>
+
+<h1>4chan Image Converter <span class="sub">— convert any image to a JPEG sized for uploading</span></h1>
+
+<div class="layout">
+  <aside class="panel" id="panel">
+
+    <details open>
+      <summary>Open Image</summary>
+      <div class="section-body">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="primary" id="btnOpenImage">Open Image…</button>
+          <input type="file" id="f_imageFile" accept="image/*" style="display:none">
+        </div>
+        <div class="note">Nothing is uploaded, the file stays in your browser. You can also drag &amp; drop a file onto the preview area. Resolution is kept exactly as-is; only the file's compression and format change. Animated GIF/WebP: only the first frame is used, since the output is a single static JPEG. Transparent areas are filled with white, since JPEG has no transparency.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Target Size</summary>
+      <div class="section-body">
+        <div class="row">
+          <label for="f_maxSize">Max file size (MB)</label>
+          <input type="number" id="f_maxSize" value="3" min="0.1" max="8" step="0.1">
+        </div>
+        <div class="note">The image is re-encoded as JPEG at the highest quality that still fits under this limit. 4chan's own per-image limit is usually 4 MB (some boards allow more).</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Convert</summary>
+      <div class="section-body">
+        <button class="primary" id="btnConvert" disabled>Convert to JPEG</button>
+        <div class="readout" id="convertReadout">Open an image to get started.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Download</summary>
+      <div class="section-body">
+        <div class="readout" id="downloadReadout">Convert an image first.</div>
+        <button class="primary" id="btnDownload" disabled>Download JPEG</button>
+      </div>
+    </details>
+
+  </aside>
+
+  <main class="canvas-area">
+    <div class="toolbar">
+      <div class="dims" id="dimsLabel">No image loaded</div>
+      <div class="spacer"></div>
+      <div class="result-pill" id="resultPill" style="display:none;"></div>
+    </div>
+    <div class="preview-scroll" id="previewScroll">
+      <span class="badge hidden" id="previewBadge"></span>
+      <img id="previewImg" class="hidden" alt="">
+      <div class="empty-state" id="emptyState">
+        <div class="big">🖼️</div>
+        <div>Open an image (or drag one in) to convert it for uploading.</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const FRIENDLY_TYPE = {
+    "image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP",
+    "image/gif": "GIF", "image/bmp": "BMP", "image/tiff": "TIFF",
+    "image/avif": "AVIF", "image/svg+xml": "SVG"
+  };
+
+  function formatBytes(n){
+    if(n < 1024*1024) return (n/1024).toFixed(0) + " KB";
+    return (n/(1024*1024)).toFixed(2) + " MB";
+  }
+
+  function buildOutputName(originalName){
+    const dot = originalName.lastIndexOf(".");
+    const base = dot === -1 ? originalName : originalName.slice(0, dot);
+    return base + "_4chan.jpg";
+  }
+
+  function encodeAtQuality(canvas, qPercent){
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(blob => {
+        if(!blob) reject(new Error("This browser couldn't export the image, it may be too large."));
+        else resolve(blob);
+      }, "image/jpeg", qPercent / 100);
+    });
+  }
+
+  // ============================================================
+  // UI wiring
+  // ============================================================
+  const previewImg = document.getElementById("previewImg");
+  const previewScroll = document.getElementById("previewScroll");
+  const previewBadge = document.getElementById("previewBadge");
+  const emptyState = document.getElementById("emptyState");
+  const dimsLabel = document.getElementById("dimsLabel");
+  const resultPill = document.getElementById("resultPill");
+  const convertReadout = document.getElementById("convertReadout");
+  const downloadReadout = document.getElementById("downloadReadout");
+  const btnConvert = document.getElementById("btnConvert");
+  const btnDownload = document.getElementById("btnDownload");
+  const btnOpenImage = document.getElementById("btnOpenImage");
+  const fileInput = document.getElementById("f_imageFile");
+  const f_maxSize = document.getElementById("f_maxSize");
+
+  const state = {
+    file: null, img: null, width: 0, height: 0,
+    resultBlob: null, resultQuality: null, hitCap: false,
+    previewUrl: null, resultUrl: null
+  };
+
+  function friendlyType(type){ return FRIENDLY_TYPE[type] || (type || "unknown").replace("image/","").toUpperCase(); }
+
+  function resetResult(){
+    state.resultBlob = null;
+    state.resultQuality = null;
+    state.hitCap = false;
+    if(state.resultUrl){ URL.revokeObjectURL(state.resultUrl); state.resultUrl = null; }
+    resultPill.style.display = "none";
+    downloadReadout.textContent = "Convert an image first.";
+    downloadReadout.className = "readout";
+    btnDownload.disabled = true;
+    previewBadge.classList.add("hidden");
+  }
+
+  function loadImageFile(file){
+    if(!file || !file.type.startsWith("image/")) return;
+
+    resetResult();
+    state.file = file;
+    if(state.previewUrl) URL.revokeObjectURL(state.previewUrl);
+    const url = URL.createObjectURL(file);
+    state.previewUrl = url;
+
+    const img = new Image();
+    img.onload = () => {
+      state.img = img;
+      state.width = img.naturalWidth;
+      state.height = img.naturalHeight;
+
+      previewImg.src = url;
+      previewImg.classList.remove("hidden");
+      emptyState.style.display = "none";
+      previewBadge.textContent = "ORIGINAL";
+      previewBadge.classList.remove("hidden");
+
+      dimsLabel.textContent = `${file.name} — ${state.width}×${state.height}px — ${friendlyType(file.type)} — ${formatBytes(file.size)}`;
+      convertReadout.textContent = `Ready to convert.\nOriginal: ${formatBytes(file.size)} ${friendlyType(file.type)}, ${state.width}×${state.height}px.`;
+      convertReadout.className = "readout";
+      btnConvert.disabled = false;
+    };
+    img.onerror = () => {
+      dimsLabel.textContent = "Couldn't decode that file as an image.";
+      state.img = null;
+      btnConvert.disabled = true;
+    };
+    img.src = url;
+  }
+
+  btnOpenImage.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if(fileInput.files && fileInput.files[0]) loadImageFile(fileInput.files[0]);
+    fileInput.value = "";
+  });
+
+  ["dragover", "dragenter"].forEach(evt => {
+    previewScroll.addEventListener(evt, (e) => { e.preventDefault(); previewScroll.classList.add("dragover"); });
+  });
+  ["dragleave", "dragend"].forEach(evt => {
+    previewScroll.addEventListener(evt, () => previewScroll.classList.remove("dragover"));
+  });
+  previewScroll.addEventListener("drop", (e) => {
+    e.preventDefault();
+    previewScroll.classList.remove("dragover");
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) loadImageFile(e.dataTransfer.files[0]);
+  });
+
+  btnConvert.addEventListener("click", async () => {
+    if(!state.img) return;
+    const maxMb = parseFloat(f_maxSize.value);
+    if(!(maxMb > 0)){
+      convertReadout.textContent = "Enter a valid max file size in MB.";
+      convertReadout.className = "readout bad";
+      return;
+    }
+    const maxBytes = Math.round(maxMb * 1024 * 1024);
+
+    btnConvert.disabled = true;
+    resetResult();
+    convertReadout.textContent = "Preparing canvas…";
+    convertReadout.className = "readout";
+
+    try{
+      const canvas = document.createElement("canvas");
+      canvas.width = state.width;
+      canvas.height = state.height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(state.img, 0, 0, canvas.width, canvas.height);
+
+      convertReadout.textContent = "Testing maximum quality…";
+      await new Promise(r => setTimeout(r, 0)); // let the status text paint
+
+      let finalBlob, finalQ, hitCap = false;
+      const blob100 = await encodeAtQuality(canvas, 100);
+
+      if(blob100.size <= maxBytes){
+        finalBlob = blob100;
+        finalQ = 100;
+      } else {
+        convertReadout.textContent = "Testing minimum quality…";
+        const blob1 = await encodeAtQuality(canvas, 1);
+        if(blob1.size > maxBytes){
+          finalBlob = blob1;
+          finalQ = 1;
+          hitCap = true;
+        } else {
+          let lo = 1, hi = 100, best = blob1, bestQ = 1;
+          while(lo <= hi){
+            const mid = Math.floor((lo + hi) / 2);
+            convertReadout.textContent = `Searching for the best quality… trying ${mid}%`;
+            const blob = await encodeAtQuality(canvas, mid);
+            if(blob.size <= maxBytes){
+              best = blob; bestQ = mid;
+              lo = mid + 1;
+            } else {
+              hi = mid - 1;
+            }
+          }
+          finalBlob = best;
+          finalQ = bestQ;
+        }
+      }
+
+      state.resultBlob = finalBlob;
+      state.resultQuality = finalQ;
+      state.hitCap = hitCap;
+
+      if(state.resultUrl) URL.revokeObjectURL(state.resultUrl);
+      state.resultUrl = URL.createObjectURL(finalBlob);
+      previewImg.src = state.resultUrl;
+      previewBadge.textContent = "CONVERTED";
+      previewBadge.classList.remove("hidden");
+
+      const savings = state.file.size > 0 ? Math.round((1 - finalBlob.size / state.file.size) * 100) : 0;
+
+      if(hitCap){
+        resultPill.textContent = `Over target: ${formatBytes(finalBlob.size)}`;
+        resultPill.className = "result-pill bad";
+        resultPill.style.display = "";
+        convertReadout.textContent =
+          `Couldn't fit under ${maxMb} MB at full resolution (${state.width}×${state.height}) — ` +
+          `even minimum JPEG quality (1%) is ${formatBytes(finalBlob.size)}.\n` +
+          `This is the smallest possible file at the original resolution. To get under ${maxMb} MB, ` +
+          `you'll need to downscale the image (e.g. in an image editor) before converting, since resolution is kept unchanged here.`;
+        convertReadout.className = "readout bad";
+      } else {
+        resultPill.textContent = `JPEG · ${formatBytes(finalBlob.size)} · Q${finalQ}`;
+        resultPill.className = "result-pill ok";
+        resultPill.style.display = "";
+        convertReadout.textContent =
+          `Done — JPEG quality ${finalQ}%, ${formatBytes(finalBlob.size)} (limit ${maxMb} MB), ` +
+          `${state.width}×${state.height}px unchanged.\n` +
+          (savings > 0 ? `${savings}% smaller than the original ${formatBytes(state.file.size)}.` : `Original was ${formatBytes(state.file.size)}.`);
+        convertReadout.className = "readout";
+      }
+
+      const outName = buildOutputName(state.file.name);
+      downloadReadout.textContent = `${state.file.name} → ${outName}\n${formatBytes(finalBlob.size)} JPEG, quality ${finalQ}%.` +
+        (hitCap ? "\n⚠ Still over your target size." : "");
+      downloadReadout.className = hitCap ? "readout warn" : "readout";
+      btnDownload.disabled = false;
+      dimsLabel.textContent = `${state.file.name} — ${state.width}×${state.height}px — JPEG — ${formatBytes(finalBlob.size)}`;
+    }catch(err){
+      convertReadout.textContent = "Conversion failed: " + err.message;
+      convertReadout.className = "readout bad";
+    }finally{
+      btnConvert.disabled = false;
+    }
+  });
+
+  btnDownload.addEventListener("click", () => {
+    if(!state.resultBlob || !state.file) return;
+    const url = URL.createObjectURL(state.resultBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = buildOutputName(state.file.name);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+})();
+</script>
+</body>
+</html>

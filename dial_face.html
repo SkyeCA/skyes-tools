@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DialFace — Analog Meter Face Designer</title>
+<style>
+  :root{
+    --bg: #f4f5f7;
+    --panel-bg: #ffffff;
+    --border: #d8dade;
+    --text: #1c1e21;
+    --muted: #6b7078;
+    --accent: #2b5cff;
+    --accent-hover: #1f47d6;
+    --section-bg: #fafbfc;
+    --input-bg: #ffffff;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+  }
+  h1{
+    font-size: 15px;
+    margin: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  h1 .sub{ font-weight:400; color:var(--muted); font-size:12px; }
+
+  .layout{
+    display:flex;
+    height: calc(100% - 49px);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .panel{
+    width: 340px;
+    min-width: 340px;
+    overflow-y: auto;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 10px 14px 40px;
+  }
+  details{
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  details > summary{
+    cursor: pointer;
+    padding: 9px 12px;
+    font-weight: 600;
+    font-size: 12.5px;
+    list-style: none;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    user-select:none;
+    color: var(--text);
+  }
+  details > summary::-webkit-details-marker{ display:none; }
+  details > summary::after{
+    content: "▸";
+    color: var(--muted);
+    transition: transform .15s;
+    font-size: 11px;
+  }
+  details[open] > summary::after{ transform: rotate(90deg); }
+  .section-body{
+    padding: 4px 12px 12px;
+    display:flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .row label{
+    flex: 1 1 auto;
+    color: var(--text);
+    font-size: 12.5px;
+  }
+  .row .hint{
+    display:block;
+    color: var(--muted);
+    font-size: 10.5px;
+    margin-top: 1px;
+  }
+  .row input[type=number], .row input[type=text], .row select{
+    width: 108px;
+    padding: 5px 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--input-bg);
+    color: var(--text);
+    font-size: 12.5px;
+  }
+  .row input[type=text]{ width: 150px; }
+  .row-full input[type=text]{ width: 100%; }
+  .row-full{ flex-direction: column; align-items: stretch; }
+  input[type=checkbox]{
+    width: 16px; height:16px; margin:0; accent-color: var(--accent);
+  }
+  input[type=range]{
+    width: 150px; accent-color: var(--accent);
+  }
+  .two-col{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .readout{
+    background: #eef1ff;
+    border: 1px dashed #b9c4ff;
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 11.5px;
+    color: #2b3a8f;
+    line-height: 1.5;
+  }
+  .note{
+    font-size: 11px;
+    color: var(--muted);
+    line-height:1.5;
+    padding: 2px 2px 0;
+  }
+  .presets{
+    display:flex;
+    gap:6px;
+    flex-wrap: wrap;
+  }
+  button{
+    font-family: inherit;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:hover{ background: #f0f1f3; }
+  button.primary{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+  button.primary:hover{ background: var(--accent-hover); }
+
+  /* ---------- Main / canvas area ---------- */
+  .canvas-area{
+    flex: 1;
+    display:flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    padding: 10px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .toolbar .zoomwrap{
+    display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px;
+  }
+  .toolbar .spacer{ flex:1; }
+  .toolbar .dims{
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .preview-scroll{
+    flex: 1;
+    overflow: auto;
+    display:flex;
+    align-items:flex-start;
+    justify-content:center;
+    padding: 40px 20px;
+    background:
+      linear-gradient(45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(-45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e9eaee 75%),
+      linear-gradient(-45deg, transparent 75%, #e9eaee 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #f0f1f3;
+  }
+  #previewWrap{
+    background: #fff;
+    box-shadow: 0 2px 14px rgba(0,0,0,.18);
+    transform-origin: top left;
+  }
+  #previewWrap svg{ display:block; }
+
+  .print-note{
+    font-size: 11px;
+    color: var(--muted);
+    padding: 0 16px 10px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+  }
+  .print-note strong{ color: var(--text); }
+
+  /* ---------- Print ---------- */
+  @media print{
+    @page{ size: auto; margin: 0; }
+    html, body{ background: #fff !important; }
+    body *{ visibility: hidden; }
+    #previewWrap, #previewWrap *{ visibility: visible; }
+    #previewWrap{
+      position: absolute;
+      top: 0;
+      left: 0;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>DialFace <span class="sub">— analog meter face designer, print at 1:1</span></h1>
+
+<div class="layout">
+  <aside class="panel" id="panel">
+
+    <div class="presets" style="margin-bottom:10px;">
+      <button data-preset="volts">Preset: Volts DC</button>
+      <button data-preset="watts">Preset: Watts</button>
+      <button data-preset="blank">Reset</button>
+    </div>
+
+    <details open>
+      <summary>Save &amp; Load Design</summary>
+      <div class="section-body">
+        <div class="note">Saves every setting on this page (not the rendered image) to a .json file, so you can reopen and keep editing it later.</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="primary" id="btnSaveDesign">Save Design (.json)</button>
+          <button id="btnLoadDesign">Load Design…</button>
+          <input type="file" id="f_loadDesignFile" accept="application/json,.json" style="display:none">
+        </div>
+        <div class="note" id="loadDesignStatus"></div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Units</summary>
+      <div class="section-body">
+        <div class="row">
+          <label for="f_unit">Measurement unit</label>
+          <select id="f_unit">
+            <option value="mm" selected>millimeters</option>
+            <option value="in">inches</option>
+          </select>
+        </div>
+        <div class="note">All size fields below use this unit. Switching converts existing values.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Dial Face</summary>
+      <div class="section-body">
+        <div class="two-col">
+          <div class="row row-full"><label for="f_faceWidth">Width</label><input id="f_faceWidth" type="number" step="any"></div>
+          <div class="row row-full"><label for="f_faceHeight">Height</label><input id="f_faceHeight" type="number" step="any"></div>
+        </div>
+        <div class="row"><label for="f_cornerRadius">Corner radius</label><input id="f_cornerRadius" type="number" step="any"></div>
+        <div class="row"><label for="f_borderWidth">Border thickness</label><input id="f_borderWidth" type="number" step="any"></div>
+        <div class="row"><label for="f_showBorder">Show border rectangle</label><input id="f_showBorder" type="checkbox"></div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Pivot &amp; Arm</summary>
+      <div class="section-body">
+        <div class="row"><label for="f_armLength">Arm length <span class="hint">(pivot to scale center)</span></label><input id="f_armLength" type="number" step="any"></div>
+        <div class="row"><label for="f_pivotFromBottom">Pivot height <span class="hint">from bottom edge</span></label><input id="f_pivotFromBottom" type="number" step="any"></div>
+        <div class="row"><label for="f_pivotOffsetX">Pivot offset <span class="hint">from horizontal center</span></label><input id="f_pivotOffsetX" type="number" step="any"></div>
+        <div class="row"><label for="f_showPivot">Show pivot mark</label><input id="f_showPivot" type="checkbox"></div>
+        <hr style="border:none;border-top:1px solid var(--border);width:100%;">
+        <div class="row"><label for="f_curveFlatten">Scale curvature <span class="hint">round ↔ flat</span></label><input id="f_curveFlatten" type="range" min="0" max="100" step="1"></div>
+        <div class="note" id="curveReadout"></div>
+        <div class="note">Start/end angle stay fixed — this only lifts the two ends of the printed arc toward the center, flattening the curve without changing where the needle points.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Scale Range</summary>
+      <div class="section-body">
+        <div class="two-col">
+          <div class="row row-full"><label for="f_startAngle">Start angle°</label><input id="f_startAngle" type="number" step="any"></div>
+          <div class="row row-full"><label for="f_endAngle">End angle°</label><input id="f_endAngle" type="number" step="any"></div>
+        </div>
+        <div class="note">0° = straight up. Negative = counter-clockwise (left), positive = clockwise (right). This is the needle's true angular range — it sets where min/max values point. Use "Scale curvature" (under Pivot &amp; Arm) to change how curved the printed arc looks without affecting this.</div>
+        <div class="two-col">
+          <div class="row row-full"><label for="f_minValue">Min value</label><input id="f_minValue" type="number" step="any"></div>
+          <div class="row row-full"><label for="f_maxValue">Max value</label><input id="f_maxValue" type="number" step="any"></div>
+        </div>
+        <div class="row"><label for="f_decimalPlaces">Label decimal places</label><input id="f_decimalPlaces" type="number" step="1" min="0" max="4"></div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Ticks &amp; Labels</summary>
+      <div class="section-body">
+        <div class="row"><label for="f_tickCount">Number of ticks</label><input id="f_tickCount" type="number" step="1" min="2"></div>
+        <div class="row"><label for="f_labelEvery">Label every N ticks</label><input id="f_labelEvery" type="number" step="1" min="1"></div>
+        <div class="readout" id="tickReadout"></div>
+        <div class="two-col">
+          <div class="row row-full"><label for="f_minorTickLength">Minor tick length</label><input id="f_minorTickLength" type="number" step="any"></div>
+          <div class="row row-full"><label for="f_majorTickLength">Major tick length</label><input id="f_majorTickLength" type="number" step="any"></div>
+        </div>
+        <div class="two-col">
+          <div class="row row-full"><label for="f_minorTickWidth">Minor tick weight</label><input id="f_minorTickWidth" type="number" step="any"></div>
+          <div class="row row-full"><label for="f_majorTickWidth">Major tick weight</label><input id="f_majorTickWidth" type="number" step="any"></div>
+        </div>
+        <div class="row"><label for="f_tickInset">Tick inset <span class="hint">past scale line</span></label><input id="f_tickInset" type="number" step="any"></div>
+        <div class="row"><label for="f_arcWidth">Scale line weight</label><input id="f_arcWidth" type="number" step="any"></div>
+        <div class="row"><label for="f_labelFontSize">Label font size</label><input id="f_labelFontSize" type="number" step="any"></div>
+        <div class="row"><label for="f_labelOffset">Label offset <span class="hint">from tick end</span></label><input id="f_labelOffset" type="number" step="any"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Title &amp; Units Text</summary>
+      <div class="section-body">
+        <div class="row"><label for="f_showTitle">Show title</label><input id="f_showTitle" type="checkbox"></div>
+        <div class="row row-full"><label for="f_titleText">Title text</label><input id="f_titleText" type="text"></div>
+        <div class="two-col">
+          <div class="row row-full"><label for="f_titleFontSize">Font size</label><input id="f_titleFontSize" type="number" step="any"></div>
+          <div class="row row-full"><label for="f_titleOffsetY">From top edge</label><input id="f_titleOffsetY" type="number" step="any"></div>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);width:100%;">
+        <div class="row"><label for="f_showSubtitle">Show subtitle</label><input id="f_showSubtitle" type="checkbox"></div>
+        <div class="row row-full"><label for="f_subtitleText">Subtitle text</label><input id="f_subtitleText" type="text"></div>
+        <div class="two-col">
+          <div class="row row-full"><label for="f_subtitleFontSize">Font size</label><input id="f_subtitleFontSize" type="number" step="any"></div>
+          <div class="row row-full"><label for="f_subtitleOffsetY">From bottom edge</label><input id="f_subtitleOffsetY" type="number" step="any"></div>
+        </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Needle Preview <span class="hint" style="font-weight:400;">(screen only)</span></summary>
+      <div class="section-body">
+        <div class="row"><label for="f_showNeedle">Show preview needle</label><input id="f_showNeedle" type="checkbox"></div>
+        <div class="row"><label for="f_needleValue">Value</label><input id="f_needleValue" type="range" step="any"></div>
+        <div class="note" id="needleReadout"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Mounting Holes</summary>
+      <div class="section-body">
+        <div class="row"><label for="f_showHoles">Show mounting holes</label><input id="f_showHoles" type="checkbox"></div>
+        <div class="row"><label for="f_holeCount">Number of holes</label><input id="f_holeCount" type="number" step="1" min="1" max="8"></div>
+        <div class="row"><label for="f_holeDiameter">Hole diameter</label><input id="f_holeDiameter" type="number" step="any"></div>
+        <div class="row"><label for="f_holeFromBottom">Center height <span class="hint">from bottom edge</span></label><input id="f_holeFromBottom" type="number" step="any"></div>
+        <div class="row"><label for="f_holeInset">Outer hole inset <span class="hint">from left/right edge</span></label><input id="f_holeInset" type="number" step="any"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Print &amp; Export</summary>
+      <div class="section-body">
+        <div class="row"><label for="f_showCalibration">Add print calibration mark</label><input id="f_showCalibration" type="checkbox"></div>
+        <div class="note">Adds a reference square beside the face — measure it after printing to confirm your printer used 100% scale.</div>
+        <div class="row"><label for="f_pngDpi">PNG export DPI</label><input id="f_pngDpi" type="number" step="1" min="72" max="1200"></div>
+        <div style="display:flex; gap:8px; margin-top:4px; flex-wrap:wrap;">
+          <button class="primary" id="btnPrint">Print (1:1)</button>
+          <button id="btnDownloadSvg">Download SVG</button>
+          <button id="btnDownloadPng">Download PNG</button>
+        </div>
+      </div>
+    </details>
+
+  </aside>
+
+  <main class="canvas-area">
+    <div class="toolbar">
+      <div class="zoomwrap">
+        Zoom
+        <input type="range" id="f_zoom" min="0.25" max="4" step="0.05" value="1">
+        <span id="zoomLabel">100%</span>
+      </div>
+      <div class="spacer"></div>
+      <div class="dims" id="dimsLabel"></div>
+    </div>
+    <div class="print-note">
+      When printing: set <strong>Margins → None</strong> and <strong>Scale → 100% / Actual size</strong> (not "Fit to page"). Zoom above is for on-screen viewing only and never affects print or export size.
+    </div>
+    <div class="preview-scroll">
+      <div id="previewWrap">
+        <svg id="meterSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const MM_PER_IN = 25.4;
+
+  // Which state keys are physical lengths (converted when unit toggles)
+  const LENGTH_KEYS = new Set([
+    "faceWidth","faceHeight","cornerRadius","borderWidth",
+    "armLength","pivotFromBottom","pivotOffsetX",
+    "minorTickLength","majorTickLength","minorTickWidth","majorTickWidth",
+    "tickInset","arcWidth","labelFontSize","labelOffset",
+    "titleFontSize","titleOffsetY","subtitleFontSize","subtitleOffsetY",
+    "holeDiameter","holeFromBottom","holeInset"
+  ]);
+
+  // All defaults are authored once in inches; mm is always derived by
+  // converting the length fields, so the two unit presets stay in sync
+  // and geometry (title/scale clearance etc.) only has to be tuned once.
+  function baseDefaultsMm(){
+    return {
+      unit: "mm",
+      faceWidth: 115, faceHeight: 90, cornerRadius: 2.5, borderWidth: 0.5, showBorder: true,
+      armLength: 48, pivotFromBottom: 19, pivotOffsetX: 0, showPivot: true, curveFlatten: 0,
+      startAngle: -45, endAngle: 45, minValue: 0, maxValue: 30, decimalPlaces: 0,
+      tickCount: 31, labelEvery: 5,
+      minorTickLength: 1.8, majorTickLength: 3.8, minorTickWidth: 0.2, majorTickWidth: 0.5,
+      tickInset: 0.5, arcWidth: 0.4, labelFontSize: 4.3, labelOffset: 1.8,
+      showTitle: true, titleText: "VOLTS DC", titleFontSize: 4.8, titleOffsetY: 5.6,
+      showSubtitle: false, subtitleText: "0 - 30", subtitleFontSize: 3.5, subtitleOffsetY: 8,
+      showNeedle: false, needleValue: 15,
+      showHoles: true, holeCount: 3, holeDiameter: 2.5, holeFromBottom: 5.6, holeInset: 10,
+      showCalibration: false, pngDpi: 300, zoom: 1
+    };
+  }
+
+  function convertState(s, fromUnit, toUnitName){
+    if(fromUnit === toUnitName) return Object.assign({}, s);
+    const factor = (fromUnit === "in" && toUnitName === "mm") ? MM_PER_IN : (1 / MM_PER_IN);
+    const out = Object.assign({}, s);
+    LENGTH_KEYS.forEach(k => { out[k] = round(s[k] * factor, 5); });
+    out.unit = toUnitName;
+    return out;
+  }
+
+  function defaultsFor(unit){
+    const base = baseDefaultsMm();
+    return unit === "mm" ? base : convertState(base, "mm", "in");
+  }
+
+  const PRESETS = {
+    volts: (unit) => defaultsFor(unit),
+    watts: (unit) => {
+      const baseMm = baseDefaultsMm();
+      Object.assign(baseMm, {
+        faceWidth: 132,
+        startAngle: -60, endAngle: 60, minValue: 0, maxValue: 2000,
+        tickCount: 41, labelEvery: 5, decimalPlaces: 0,
+        titleText: "WATTS", showTitle: true,
+        holeInset: 13, holeFromBottom: 6
+      });
+      return unit === "mm" ? baseMm : convertState(baseMm, "mm", "in");
+    },
+    blank: (unit) => defaultsFor(unit)
+  };
+
+  let state = defaultsFor("mm");
+
+  const FIELD_IDS = [
+    "unit","faceWidth","faceHeight","cornerRadius","borderWidth","showBorder",
+    "armLength","pivotFromBottom","pivotOffsetX","showPivot","curveFlatten",
+    "startAngle","endAngle","minValue","maxValue","decimalPlaces",
+    "tickCount","labelEvery","minorTickLength","majorTickLength","minorTickWidth","majorTickWidth",
+    "tickInset","arcWidth","labelFontSize","labelOffset",
+    "showTitle","titleText","titleFontSize","titleOffsetY",
+    "showSubtitle","subtitleText","subtitleFontSize","subtitleOffsetY",
+    "showNeedle","needleValue",
+    "showHoles","holeCount","holeDiameter","holeFromBottom","holeInset",
+    "showCalibration","pngDpi","zoom"
+  ];
+
+  function el(id){ return document.getElementById("f_" + id); }
+
+  function escapeXml(str){
+    return String(str).replace(/[&<>"']/g, c => ({
+      "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&apos;"
+    }[c]));
+  }
+
+  function round(n, d){
+    const p = Math.pow(10, d);
+    return Math.round(n * p) / p;
+  }
+
+  function polar(px, py, r, angleDeg){
+    const rad = angleDeg * Math.PI / 180;
+    return { x: px + r * Math.sin(rad), y: py - r * Math.cos(rad) };
+  }
+
+  // Radius of the printed scale at a given angle. At curveFlatten=0 this is
+  // just the constant arm length (a true circle, needle tip always touches
+  // the scale). Increasing curveFlatten grows the radius away from the
+  // sweep's center angle — using the polar equation of a straight line,
+  // r = armLength / cos(localAngle) — which lifts the two ends of the arc
+  // upward while leaving the center (and the start/end angle mapping) fixed,
+  // smoothly flattening the curve toward a straight line at 100%.
+  function scaleRadiusAt(s, angleDeg){
+    const f = Math.min(1, Math.max(0, (s.curveFlatten || 0) / 100));
+    if(f <= 0) return s.armLength;
+    const center = (s.startAngle + s.endAngle) / 2;
+    const maxLocalDeg = 82;
+    let localDeg = angleDeg - center;
+    if(localDeg > maxLocalDeg) localDeg = maxLocalDeg;
+    if(localDeg < -maxLocalDeg) localDeg = -maxLocalDeg;
+    const local = localDeg * Math.PI / 180;
+    const secant = 1 / Math.cos(local);
+    return s.armLength * ((1 - f) + f * secant);
+  }
+
+  function fmtNum(v, decimals){
+    return Number(v).toFixed(decimals);
+  }
+
+  // ---------- Build SVG markup from state ----------
+  function buildSvg(s){
+    const unit = s.unit;
+    const cx = s.faceWidth / 2 + s.pivotOffsetX;
+    const cy = s.faceHeight - s.pivotFromBottom;
+
+    const calSize = unit === "in" ? 1 : 25;
+    const calGap = unit === "in" ? 0.25 : 6;
+    const extraW = s.showCalibration ? (calGap + calSize + calGap) : 0;
+
+    const canvasW = s.faceWidth + extraW;
+    const canvasH = Math.max(s.faceHeight, calSize + calGap * 2);
+
+    let parts = [];
+
+    // background
+    parts.push(`<rect x="0" y="0" width="${round(canvasW,4)}" height="${round(canvasH,4)}" fill="#ffffff"/>`);
+
+    // face group
+    parts.push(`<g>`);
+    if(s.showBorder){
+      parts.push(`<rect x="${round(s.borderWidth/2,4)}" y="${round(s.borderWidth/2,4)}" width="${round(s.faceWidth-s.borderWidth,4)}" height="${round(s.faceHeight-s.borderWidth,4)}" rx="${round(s.cornerRadius,4)}" ry="${round(s.cornerRadius,4)}" fill="none" stroke="#000" stroke-width="${round(s.borderWidth,4)}"/>`);
+    }
+
+    // scale arc — sampled as a polyline so it can follow the (possibly
+    // flattened) per-angle radius, not just a true circular arc
+    const arcSamples = Math.max(2, Math.ceil(Math.abs(s.endAngle - s.startAngle)));
+    let arcPts = [];
+    for(let i = 0; i <= arcSamples; i++){
+      const tt = i / arcSamples;
+      const ang = s.startAngle + tt * (s.endAngle - s.startAngle);
+      const rr = scaleRadiusAt(s, ang);
+      arcPts.push(polar(cx, cy, rr, ang));
+    }
+    const arcPath = "M " + arcPts.map(p => round(p.x,4) + " " + round(p.y,4)).join(" L ");
+    parts.push(`<path d="${arcPath}" fill="none" stroke="#000" stroke-width="${round(s.arcWidth,4)}"/>`);
+
+    // ticks + labels
+    const n = Math.max(2, Math.round(s.tickCount));
+    const every = Math.max(1, Math.round(s.labelEvery));
+    for(let i = 0; i < n; i++){
+      const t = (n === 1) ? 0 : i / (n - 1);
+      const angle = s.startAngle + t * (s.endAngle - s.startAngle);
+      const value = s.minValue + t * (s.maxValue - s.minValue);
+      const isMajor = (i % every) === 0;
+      const len = isMajor ? s.majorTickLength : s.minorTickLength;
+      const wgt = isMajor ? s.majorTickWidth : s.minorTickWidth;
+      const rBase = scaleRadiusAt(s, angle);
+      const rInner = rBase - s.tickInset;
+      const rOuter = rBase + len;
+      const p1 = polar(cx, cy, rInner, angle);
+      const p2 = polar(cx, cy, rOuter, angle);
+      parts.push(`<line x1="${round(p1.x,4)}" y1="${round(p1.y,4)}" x2="${round(p2.x,4)}" y2="${round(p2.y,4)}" stroke="#000" stroke-width="${round(wgt,4)}"/>`);
+      if(isMajor){
+        const lp = polar(cx, cy, rOuter + s.labelOffset, angle);
+        parts.push(`<text x="${round(lp.x,4)}" y="${round(lp.y,4)}" font-family="Helvetica, Arial, sans-serif" font-size="${round(s.labelFontSize,4)}" text-anchor="middle" dominant-baseline="central" fill="#000">${escapeXml(fmtNum(value, s.decimalPlaces))}</text>`);
+      }
+    }
+
+    // pivot mark
+    if(s.showPivot){
+      const pr = Math.max(s.majorTickWidth * 2, s.armLength * 0.02);
+      parts.push(`<circle cx="${round(cx,4)}" cy="${round(cy,4)}" r="${round(pr,4)}" fill="#000"/>`);
+    }
+
+    // needle preview (screen-only visual aid)
+    if(s.showNeedle){
+      const clamped = Math.min(Math.max(s.needleValue, Math.min(s.minValue,s.maxValue)), Math.max(s.minValue,s.maxValue));
+      const nt = (s.maxValue === s.minValue) ? 0 : (clamped - s.minValue) / (s.maxValue - s.minValue);
+      const nAngle = s.startAngle + nt * (s.endAngle - s.startAngle);
+      const tip = polar(cx, cy, scaleRadiusAt(s, nAngle), nAngle);
+      parts.push(`<line x1="${round(cx,4)}" y1="${round(cy,4)}" x2="${round(tip.x,4)}" y2="${round(tip.y,4)}" stroke="#c0392b" stroke-width="${round(s.majorTickWidth,4)}"/>`);
+    }
+
+    // title
+    if(s.showTitle && s.titleText){
+      parts.push(`<text x="${round(s.faceWidth/2,4)}" y="${round(s.titleOffsetY,4)}" font-family="Helvetica, Arial, sans-serif" font-size="${round(s.titleFontSize,4)}" font-weight="bold" text-anchor="middle" dominant-baseline="hanging" fill="#000">${escapeXml(s.titleText)}</text>`);
+    }
+    // subtitle
+    if(s.showSubtitle && s.subtitleText){
+      parts.push(`<text x="${round(s.faceWidth/2,4)}" y="${round(s.faceHeight - s.subtitleOffsetY,4)}" font-family="Helvetica, Arial, sans-serif" font-size="${round(s.subtitleFontSize,4)}" text-anchor="middle" dominant-baseline="auto" fill="#000">${escapeXml(s.subtitleText)}</text>`);
+    }
+
+    // mounting holes
+    if(s.showHoles){
+      const hc = Math.max(1, Math.round(s.holeCount));
+      const hy = s.faceHeight - s.holeFromBottom;
+      for(let j = 0; j < hc; j++){
+        let hx;
+        if(hc === 1){ hx = s.faceWidth/2; }
+        else { hx = s.holeInset + j * (s.faceWidth - 2*s.holeInset) / (hc - 1); }
+        parts.push(`<circle cx="${round(hx,4)}" cy="${round(hy,4)}" r="${round(s.holeDiameter/2,4)}" fill="none" stroke="#000" stroke-width="${round(s.borderWidth,4)}"/>`);
+      }
+    }
+
+    parts.push(`</g>`);
+
+    // calibration block
+    if(s.showCalibration){
+      const gx = s.faceWidth + calGap;
+      const gy = calGap;
+      parts.push(`<g>`);
+      parts.push(`<rect x="${round(gx,4)}" y="${round(gy,4)}" width="${round(calSize,4)}" height="${round(calSize,4)}" fill="none" stroke="#000" stroke-width="${unit==='in'?0.01:0.25}"/>`);
+      parts.push(`<text x="${round(gx + calSize/2,4)}" y="${round(gy + calSize + (unit==='in'?0.16:4),4)}" font-family="Helvetica, Arial, sans-serif" font-size="${unit==='in'?0.13:3.2}" text-anchor="middle" fill="#000">${unit==='in' ? '1.000 in' : '25 mm'}</text>`);
+      parts.push(`<text x="${round(gx + calSize/2,4)}" y="${round(gy + calSize + (unit==='in'?0.32:8),4)}" font-family="Helvetica, Arial, sans-serif" font-size="${unit==='in'?0.1:2.4}" text-anchor="middle" fill="#666">measure to verify 100% print scale</text>`);
+      parts.push(`</g>`);
+    }
+
+    return { svgInner: parts.join(""), canvasW, canvasH };
+  }
+
+  function render(){
+    const { svgInner, canvasW, canvasH } = buildSvg(state);
+    const svg = document.getElementById("meterSvg");
+    const unitSuffix = state.unit;
+    svg.setAttribute("width", round(canvasW,4) + unitSuffix);
+    svg.setAttribute("height", round(canvasH,4) + unitSuffix);
+    svg.setAttribute("viewBox", `0 0 ${round(canvasW,4)} ${round(canvasH,4)}`);
+    svg.innerHTML = svgInner;
+
+    document.getElementById("previewWrap").style.transform = `scale(${state.zoom})`;
+    document.getElementById("zoomLabel").textContent = Math.round(state.zoom*100) + "%";
+    document.getElementById("dimsLabel").textContent =
+      `${round(state.faceWidth,3)} × ${round(state.faceHeight,3)} ${state.unit}  (canvas ${round(canvasW,3)} × ${round(canvasH,3)} ${state.unit})`;
+
+    const n = Math.max(2, Math.round(state.tickCount));
+    const perTickVal = (state.maxValue - state.minValue) / (n - 1);
+    const perTickAngle = (state.endAngle - state.startAngle) / (n - 1);
+    document.getElementById("tickReadout").textContent =
+      `Value per tick: ${round(perTickVal,4)}  ·  Angle per tick: ${round(perTickAngle,3)}°  ·  Total sweep: ${round(state.endAngle-state.startAngle,2)}°`;
+
+    document.getElementById("needleReadout").textContent = `Needle value: ${fmtNum(state.needleValue, state.decimalPlaces)}`;
+
+    const cf = state.curveFlatten || 0;
+    document.getElementById("curveReadout").textContent =
+      cf <= 0 ? "0% — true circular arc"
+      : cf >= 100 ? "100% — fully flat (straight line)"
+      : `${round(cf,0)}% flattened`;
+
+    syncFormFromState();
+  }
+
+  // ---------- Form <-> state ----------
+  function syncFormFromState(){
+    FIELD_IDS.forEach(key => {
+      const node = el(key);
+      if(!node) return;
+      if(node.type === "checkbox"){
+        node.checked = !!state[key];
+      } else {
+        // avoid clobbering focused input mid-typing
+        if(document.activeElement !== node){
+          node.value = state[key];
+        }
+      }
+    });
+    // needle slider range depends on current min/max
+    const needleEl = el("needleValue");
+    if(needleEl){
+      needleEl.min = Math.min(state.minValue, state.maxValue);
+      needleEl.max = Math.max(state.minValue, state.maxValue);
+      needleEl.step = Math.max((state.maxValue - state.minValue) / 500, 0.0001);
+      if(document.activeElement !== needleEl){
+        needleEl.value = state.needleValue;
+      }
+    }
+  }
+
+  function bindEvents(){
+    FIELD_IDS.forEach(key => {
+      const node = el(key);
+      if(!node) return;
+      const evt = (node.type === "range" || node.type === "checkbox") ? "input" : "input";
+      node.addEventListener(evt, () => {
+        if(key === "unit"){
+          convertUnits(node.value);
+          return;
+        }
+        if(node.type === "checkbox"){
+          state[key] = node.checked;
+        } else if(node.type === "number" || node.type === "range"){
+          const v = parseFloat(node.value);
+          state[key] = isNaN(v) ? 0 : v;
+        } else {
+          state[key] = node.value;
+        }
+        render();
+      });
+    });
+
+    document.querySelectorAll("[data-preset]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const name = btn.getAttribute("data-preset");
+        state = PRESETS[name](state.unit);
+        render();
+      });
+    });
+
+    document.getElementById("btnPrint").addEventListener("click", () => window.print());
+    document.getElementById("btnDownloadSvg").addEventListener("click", downloadSvg);
+    document.getElementById("btnDownloadPng").addEventListener("click", downloadPng);
+
+    document.getElementById("btnSaveDesign").addEventListener("click", saveDesign);
+    const loadFileEl = document.getElementById("f_loadDesignFile");
+    document.getElementById("btnLoadDesign").addEventListener("click", () => loadFileEl.click());
+    loadFileEl.addEventListener("change", () => {
+      if(loadFileEl.files && loadFileEl.files[0]){
+        loadDesign(loadFileEl.files[0]);
+      }
+      loadFileEl.value = "";
+    });
+  }
+
+  function convertUnits(newUnit){
+    if(newUnit === state.unit) return;
+    state = convertState(state, state.unit, newUnit);
+    render();
+  }
+
+  // ---------- Export ----------
+  function serializeCurrentSvg(){
+    const svg = document.getElementById("meterSvg");
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    return new XMLSerializer().serializeToString(clone);
+  }
+
+  function downloadSvg(){
+    const src = serializeCurrentSvg();
+    const blob = new Blob([src], { type: "image/svg+xml" });
+    triggerDownload(URL.createObjectURL(blob), "dialface.svg");
+  }
+
+  function downloadPng(){
+    const src = serializeCurrentSvg();
+    const svg = document.getElementById("meterSvg");
+    const wAttr = svg.getAttribute("width");
+    const physicalW = parseFloat(wAttr);
+    const unit = wAttr.replace(/[0-9.\-]/g, "");
+    const vb = svg.getAttribute("viewBox").split(" ").map(Number);
+    const canvasW = vb[2], canvasH = vb[3];
+
+    const dpi = Math.max(72, Math.round(state.pngDpi || 300));
+    const inches = unit === "mm" ? (canvasW / MM_PER_IN) : canvasW;
+    const inchesH = unit === "mm" ? (canvasH / MM_PER_IN) : (canvasH * (canvasW ? 1 : 1));
+    const pxW = Math.round(inches * dpi);
+    const aspect = canvasH / canvasW;
+    const pxH = Math.round(pxW * aspect);
+
+    const img = new Image();
+    const blob = new Blob([src], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    img.onload = function(){
+      const canvas = document.createElement("canvas");
+      canvas.width = pxW;
+      canvas.height = pxH;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0,0,pxW,pxH);
+      ctx.drawImage(img, 0, 0, pxW, pxH);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(b => triggerDownload(URL.createObjectURL(b), "dialface.png"), "image/png");
+    };
+    img.src = url;
+  }
+
+  function triggerDownload(url, filename){
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  // ---------- Save / Load design (all control values, not the rendered image) ----------
+  function saveDesign(){
+    const payload = Object.assign({ _type: "dialface-design", _version: 1 }, state);
+    const json = JSON.stringify(payload, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const safeName = (state.titleText || "dialface").toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "dialface";
+    triggerDownload(URL.createObjectURL(blob), `${safeName}.json`);
+  }
+
+  function coerceFieldValue(key, raw){
+    const node = el(key);
+    const type = node ? node.type : (typeof raw === "number" ? "number" : "text");
+    if(type === "checkbox") return !!raw;
+    if(type === "number" || type === "range"){
+      const v = typeof raw === "number" ? raw : parseFloat(raw);
+      return isNaN(v) ? undefined : v;
+    }
+    return String(raw);
+  }
+
+  function loadDesign(file){
+    const statusEl = document.getElementById("loadDesignStatus");
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result);
+        if(typeof data !== "object" || data === null){
+          throw new Error("not a valid settings file");
+        }
+        const next = Object.assign({}, state);
+        let restored = 0;
+        FIELD_IDS.forEach(key => {
+          if(Object.prototype.hasOwnProperty.call(data, key)){
+            const v = coerceFieldValue(key, data[key]);
+            if(v !== undefined){ next[key] = v; restored++; }
+          }
+        });
+        if(restored === 0){
+          throw new Error("file doesn't contain any recognized DialFace settings");
+        }
+        state = next;
+        render();
+        statusEl.style.color = "";
+        statusEl.textContent = `Loaded "${file.name}".`;
+      } catch(err){
+        statusEl.style.color = "#c0392b";
+        statusEl.textContent = `Couldn't load file: ${err.message}`;
+      }
+    };
+    reader.onerror = () => {
+      statusEl.style.color = "#c0392b";
+      statusEl.textContent = "Couldn't read file.";
+    };
+    reader.readAsText(file);
+  }
+
+  bindEvents();
+  render();
+})();
+</script>
+</body>
+</html>

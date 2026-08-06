@@ -1,0 +1,1142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XMP Editor — View &amp; Edit Image Metadata</title>
+<style>
+  :root{
+    --bg: #f4f5f7;
+    --panel-bg: #ffffff;
+    --border: #d8dade;
+    --text: #1c1e21;
+    --muted: #6b7078;
+    --accent: #2b5cff;
+    --accent-hover: #1f47d6;
+    --section-bg: #fafbfc;
+    --input-bg: #ffffff;
+    --ok: #1a7f37;
+    --bad: #c22b2b;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+  }
+  h1{
+    font-size: 15px;
+    margin: 0;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  h1 .sub{ font-weight:400; color:var(--muted); font-size:12px; }
+
+  .layout{
+    display:flex;
+    height: calc(100% - 49px);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .panel{
+    width: 300px;
+    min-width: 300px;
+    overflow-y: auto;
+    background: var(--panel-bg);
+    border-right: 1px solid var(--border);
+    padding: 10px 14px 40px;
+  }
+  details{
+    background: var(--section-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  details > summary{
+    cursor: pointer;
+    padding: 9px 12px;
+    font-weight: 600;
+    font-size: 12.5px;
+    list-style: none;
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    user-select:none;
+    color: var(--text);
+  }
+  details > summary::-webkit-details-marker{ display:none; }
+  details > summary::after{
+    content: "▸";
+    color: var(--muted);
+    transition: transform .15s;
+    font-size: 11px;
+  }
+  details[open] > summary::after{ transform: rotate(90deg); }
+  .section-body{
+    padding: 8px 12px 12px;
+    display:flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .note{
+    font-size: 11px;
+    color: var(--muted);
+    line-height:1.5;
+    padding: 2px 2px 0;
+  }
+  .readout{
+    background: #eef1ff;
+    border: 1px dashed #b9c4ff;
+    border-radius: 6px;
+    padding: 7px 9px;
+    font-size: 11.5px;
+    color: #2b3a8f;
+    line-height: 1.5;
+    white-space: pre-line;
+    word-break: break-word;
+  }
+  button{
+    font-family: inherit;
+    font-size: 12px;
+    padding: 7px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+  }
+  button:hover{ background: #f0f1f3; }
+  button.primary{
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    width: 100%;
+  }
+  button.primary:hover{ background: var(--accent-hover); }
+  button:disabled, button.primary:disabled{
+    opacity: .5;
+    cursor: not-allowed;
+    background: #fff;
+    color: var(--muted);
+    border-color: var(--border);
+  }
+
+  /* ---------- Main / image + editor area ---------- */
+  .canvas-area{
+    flex: 1;
+    display:flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .toolbar{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    padding: 10px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .toolbar .spacer{ flex:1; }
+  .toolbar .dims{
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .preview-scroll{
+    flex: 0 0 160px;
+    height: 160px;
+    overflow: auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 12px 20px;
+    background:
+      linear-gradient(45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(-45deg, #e9eaee 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #e9eaee 75%),
+      linear-gradient(-45deg, transparent 75%, #e9eaee 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    background-color: #f0f1f3;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+  }
+  .preview-scroll.dragover::after{
+    content: "Drop image to open";
+    position: absolute;
+    inset: 12px;
+    border: 2px dashed var(--accent);
+    border-radius: 10px;
+    background: rgba(43,92,255,0.06);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    pointer-events: none;
+  }
+  #previewImg{
+    max-width: 100%;
+    max-height: 136px;
+    display:block;
+    box-shadow: 0 2px 14px rgba(0,0,0,.18);
+    background: #fff;
+  }
+  #previewImg.hidden{ display:none; }
+
+  .empty-state{
+    color: var(--muted);
+    font-size: 14px;
+    text-align:center;
+    padding: 10px 30px;
+    max-width: 360px;
+  }
+  .empty-state .big{ font-size: 26px; margin-bottom: 6px; }
+
+  /* ---------- Editor split ---------- */
+  .editor-split{
+    flex: 1;
+    display:flex;
+    min-height: 0;
+  }
+  .fields-col{
+    flex: 1 1 0;
+    min-width: 320px;
+    overflow-y: auto;
+    padding: 16px 20px 40px;
+    border-right: 1px solid var(--border);
+    background: var(--panel-bg);
+  }
+  .raw-col{
+    flex: 1 1 0;
+    min-width: 320px;
+    display:flex;
+    flex-direction: column;
+    padding: 16px 20px;
+    background: var(--panel-bg);
+    min-height: 0;
+  }
+  .col-title{
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  .field-group{ margin-bottom: 18px; }
+  .field-group-title{
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--accent);
+    margin: 0 0 8px;
+  }
+  .field-row{ margin-bottom: 12px; }
+  .field-row label{
+    display:block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+  .field-row .hint{
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--muted);
+  }
+  input[type=text], textarea, select{
+    width: 100%;
+    font-family: inherit;
+    font-size: 12.5px;
+    padding: 7px 9px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--text);
+  }
+  input[type=text]:disabled, textarea:disabled, select:disabled{
+    background: var(--section-bg);
+    color: var(--muted);
+  }
+  .field-row textarea{ min-height: 50px; resize: vertical; }
+  #otherProps{ white-space: pre-wrap; }
+
+  .raw-header{
+    display:flex;
+    align-items:baseline;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  .valid-note{ font-size: 11px; color: var(--muted); }
+  .valid-note.ok{ color: var(--ok); }
+  .valid-note.bad{ color: var(--bad); font-weight:600; }
+  #xmpRaw{
+    flex: 1;
+    min-height: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+    resize: none;
+    white-space: pre;
+    overflow: auto;
+  }
+  .raw-actions{
+    display:flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .raw-actions button{ flex: 1; }
+
+  @media (max-width: 900px){
+    .editor-split{ flex-direction: column; overflow-y:auto; }
+    .fields-col, .raw-col{ border-right:none; border-bottom:1px solid var(--border); min-width:0; }
+    #xmpRaw{ min-height: 260px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>XMP Editor <span class="sub">— view and edit an image's XMP metadata, then save a modified copy</span></h1>
+
+<div class="layout">
+  <aside class="panel" id="panel">
+
+    <details open>
+      <summary>Open Image</summary>
+      <div class="section-body">
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <button class="primary" id="btnOpenImage">Open Image…</button>
+          <input type="file" id="f_imageFile" accept="image/*" style="display:none">
+        </div>
+        <div class="note">Nothing is uploaded — the file stays in your browser. You can also drag &amp; drop a file onto the image area. XMP reading/writing is supported for <strong>JPEG</strong> and <strong>PNG</strong>; other formats can't be edited here. Very large "Extended XMP" packets split across multiple JPEG segments aren't merged — only the primary packet is shown.</div>
+      </div>
+    </details>
+
+    <details open>
+      <summary>Download</summary>
+      <div class="section-body">
+        <div class="readout" id="downloadReadout">Open an image to get started.</div>
+        <button class="primary" id="btnDownload" disabled>Download Edited Image</button>
+        <div class="note">Saved with <code>_XMPEDIT</code> added to the original filename. All other image data and metadata (pixels, EXIF, ICC profile, etc.) is left untouched.</div>
+      </div>
+    </details>
+
+  </aside>
+
+  <main class="canvas-area">
+    <div class="toolbar">
+      <div class="dims" id="dimsLabel">No image loaded</div>
+      <div class="spacer"></div>
+      <div class="dims" id="xmpStatusLabel"></div>
+    </div>
+    <div class="preview-scroll" id="previewScroll">
+      <img id="previewImg" class="hidden" alt="">
+      <div class="empty-state" id="emptyState">
+        <div class="big">🏷️</div>
+        <div>Open an image (or drag one in) to inspect and edit its XMP data.</div>
+      </div>
+    </div>
+
+    <div class="editor-split">
+      <div class="fields-col">
+        <p class="col-title">Common Fields</p>
+
+        <div class="field-group">
+          <p class="field-group-title">Description</p>
+          <div class="field-row">
+            <label for="f_title">Title</label>
+            <input type="text" id="f_title" disabled>
+          </div>
+          <div class="field-row">
+            <label for="f_description">Description / Caption</label>
+            <textarea id="f_description" disabled></textarea>
+          </div>
+          <div class="field-row">
+            <label for="f_headline">Headline</label>
+            <input type="text" id="f_headline" disabled>
+          </div>
+          <div class="field-row">
+            <label for="f_subject">Keywords <span class="hint">(comma-separated)</span></label>
+            <input type="text" id="f_subject" placeholder="landscape, sunset, california" disabled>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <p class="field-group-title">Authorship &amp; Rights</p>
+          <div class="field-row">
+            <label for="f_creator">Creator(s) <span class="hint">(comma-separated)</span></label>
+            <input type="text" id="f_creator" placeholder="Jane Doe, John Smith" disabled>
+          </div>
+          <div class="field-row">
+            <label for="f_credit">Credit</label>
+            <input type="text" id="f_credit" disabled>
+          </div>
+          <div class="field-row">
+            <label for="f_source">Source</label>
+            <input type="text" id="f_source" disabled>
+          </div>
+          <div class="field-row">
+            <label for="f_rights">Copyright / Rights</label>
+            <input type="text" id="f_rights" disabled>
+          </div>
+          <div class="field-row">
+            <label for="f_marked">Copyright Status</label>
+            <select id="f_marked" disabled>
+              <option value="">(unset)</option>
+              <option value="True">Marked as copyrighted</option>
+              <option value="False">Public domain</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="f_usageterms">Usage Terms</label>
+            <textarea id="f_usageterms" disabled></textarea>
+          </div>
+          <div class="field-row">
+            <label for="f_webstatement">Web Statement URL</label>
+            <input type="text" id="f_webstatement" disabled>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <p class="field-group-title">Other</p>
+          <div class="field-row">
+            <label for="f_rating">Rating</label>
+            <select id="f_rating" disabled>
+              <option value="">(unset)</option>
+              <option value="-1">Rejected</option>
+              <option value="0">0</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+            </select>
+          </div>
+          <div class="field-row">
+            <label for="f_creatortool">Creator Tool</label>
+            <input type="text" id="f_creatortool" disabled>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <p class="field-group-title">Other properties detected (read-only)</p>
+          <div class="readout" id="otherProps">Open an image to see additional properties here.</div>
+          <div class="note">Anything not covered by the fields above. Edit these in the raw XMP box on the right.</div>
+        </div>
+      </div>
+
+      <div class="raw-col">
+        <div class="raw-header">
+          <p class="col-title" style="margin:0;">Raw XMP (XML)</p>
+          <span class="valid-note" id="rawValidity"></span>
+        </div>
+        <textarea id="xmpRaw" placeholder="Open an image to view its raw XMP packet here." disabled spellcheck="false"></textarea>
+        <div class="raw-actions">
+          <button id="btnResetXmp" disabled>Reset to Loaded</button>
+          <button id="btnRemoveXmp" disabled>Remove All Metadata</button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ============================================================
+  // Namespaces
+  // ============================================================
+  const NS = {
+    x: "adobe:ns:meta/",
+    rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    dc: "http://purl.org/dc/elements/1.1/",
+    xmp: "http://ns.adobe.com/xap/1.0/",
+    photoshop: "http://ns.adobe.com/photoshop/1.0/",
+    xmpRights: "http://ns.adobe.com/xap/1.0/rights/",
+    xmlns: "http://www.w3.org/2000/xmlns/",
+    xml: "http://www.w3.org/XML/1998/namespace"
+  };
+
+  const FIELDS = [
+    { id:"f_title",        ns:"dc",        uri:NS.dc,        name:"title",       kind:"langalt" },
+    { id:"f_description",  ns:"dc",        uri:NS.dc,        name:"description", kind:"langalt" },
+    { id:"f_headline",     ns:"photoshop", uri:NS.photoshop, name:"Headline",    kind:"simple"  },
+    { id:"f_subject",      ns:"dc",        uri:NS.dc,        name:"subject",     kind:"bag"     },
+    { id:"f_creator",      ns:"dc",        uri:NS.dc,        name:"creator",     kind:"seq"     },
+    { id:"f_credit",       ns:"photoshop", uri:NS.photoshop, name:"Credit",      kind:"simple"  },
+    { id:"f_source",       ns:"photoshop", uri:NS.photoshop, name:"Source",      kind:"simple"  },
+    { id:"f_rights",       ns:"dc",        uri:NS.dc,        name:"rights",      kind:"langalt" },
+    { id:"f_marked",       ns:"xmpRights", uri:NS.xmpRights, name:"Marked",      kind:"simple"  },
+    { id:"f_usageterms",   ns:"xmpRights", uri:NS.xmpRights, name:"UsageTerms",  kind:"langalt" },
+    { id:"f_webstatement", ns:"xmpRights", uri:NS.xmpRights, name:"WebStatement",kind:"simple"  },
+    { id:"f_rating",       ns:"xmp",       uri:NS.xmp,       name:"Rating",      kind:"simple"  },
+    { id:"f_creatortool",  ns:"xmp",       uri:NS.xmp,       name:"CreatorTool", kind:"simple"  }
+  ];
+
+  // ============================================================
+  // XML helpers (read/write across all rdf:Description blocks —
+  // real-world files, e.g. from ExifTool, often split properties
+  // across several sibling Description elements with the same
+  // rdf:about)
+  // ============================================================
+  function parseXmpXml(text){
+    if(!text || !text.trim()) return { doc:null, error:"Empty" };
+    try{
+      const doc = new DOMParser().parseFromString(text, "application/xml");
+      const errEl = doc.getElementsByTagName("parsererror")[0];
+      if(errEl) return { doc:null, error: errEl.textContent.trim() };
+      if(!doc.documentElement) return { doc:null, error:"No root element" };
+      return { doc, error:null };
+    }catch(e){ return { doc:null, error:String(e) }; }
+  }
+  function serializeXmp(doc){ return new XMLSerializer().serializeToString(doc); }
+
+  function getAllDescriptions(doc){
+    return Array.from(doc.getElementsByTagNameNS(NS.rdf, "Description"));
+  }
+  function ensureDescription(doc, descs){
+    if(descs.length) return descs[0];
+    const rdfEl = doc.getElementsByTagNameNS(NS.rdf, "RDF")[0];
+    if(!rdfEl) return null;
+    const d = doc.createElementNS(NS.rdf, "rdf:Description");
+    d.setAttributeNS(NS.rdf, "rdf:about", "");
+    rdfEl.appendChild(d);
+    descs.push(d);
+    return d;
+  }
+  function ensureNS(el, prefix, uri){
+    if(el.lookupNamespaceURI(prefix) === uri) return;
+    el.setAttributeNS(NS.xmlns, "xmlns:" + prefix, uri);
+  }
+  function findChildEl(el, uri, name){
+    for(const c of Array.from(el.children)){
+      if(c.namespaceURI === uri && c.localName === name) return c;
+    }
+    return null;
+  }
+
+  function getSimple(descs, uri, name){
+    for(const d of descs){
+      if(d.hasAttributeNS(uri, name)) return d.getAttributeNS(uri, name);
+      const c = findChildEl(d, uri, name);
+      if(c) return c.textContent.trim();
+    }
+    return "";
+  }
+  function setSimple(doc, descs, prefix, uri, name, value){
+    value = (value || "").trim();
+    let target = null, mode = null;
+    for(const d of descs){
+      if(d.hasAttributeNS(uri, name)){ target = d; mode = "attr"; break; }
+      const c = findChildEl(d, uri, name);
+      if(c){ target = d; mode = "child"; break; }
+    }
+    if(!value){
+      if(target){
+        if(mode === "attr") target.removeAttributeNS(uri, name);
+        else target.removeChild(findChildEl(target, uri, name));
+      }
+      return;
+    }
+    if(!target){
+      target = ensureDescription(doc, descs);
+      if(!target) throw new Error("Could not find rdf:RDF to attach metadata to.");
+    } else if(mode === "child"){
+      target.removeChild(findChildEl(target, uri, name)); // normalize to attribute form
+    }
+    ensureNS(target, prefix, uri);
+    target.setAttributeNS(uri, prefix + ":" + name, value);
+  }
+
+  function getLangAlt(descs, uri, name){
+    for(const d of descs){
+      const c = findChildEl(d, uri, name);
+      if(!c) continue;
+      const alt = findChildEl(c, NS.rdf, "Alt");
+      if(!alt){ const t = c.textContent.trim(); if(t) return t; continue; }
+      const lis = Array.from(alt.children).filter(x => x.namespaceURI === NS.rdf && x.localName === "li");
+      if(!lis.length) continue;
+      const def = lis.find(li => li.getAttributeNS(NS.xml, "lang") === "x-default");
+      return (def || lis[0]).textContent.trim();
+    }
+    return "";
+  }
+  function setLangAlt(doc, descs, prefix, uri, name, value){
+    value = (value || "").trim();
+    let target = null, child = null;
+    for(const d of descs){ const c = findChildEl(d, uri, name); if(c){ target = d; child = c; break; } }
+    if(!value){ if(child) target.removeChild(child); return; }
+    if(!target){
+      target = ensureDescription(doc, descs);
+      if(!target) throw new Error("Could not find rdf:RDF to attach metadata to.");
+    }
+    if(!child){
+      ensureNS(target, prefix, uri);
+      child = doc.createElementNS(uri, prefix + ":" + name);
+      target.appendChild(child);
+    } else {
+      while(child.firstChild) child.removeChild(child.firstChild);
+    }
+    const alt = doc.createElementNS(NS.rdf, "rdf:Alt");
+    const li = doc.createElementNS(NS.rdf, "rdf:li");
+    li.setAttributeNS(NS.xml, "xml:lang", "x-default");
+    li.textContent = value;
+    alt.appendChild(li);
+    child.appendChild(alt);
+  }
+
+  function getArray(descs, uri, name){
+    for(const d of descs){
+      const c = findChildEl(d, uri, name);
+      if(!c) continue;
+      const container = c.firstElementChild;
+      if(!container) continue;
+      const lis = Array.from(container.children)
+        .filter(x => x.namespaceURI === NS.rdf && x.localName === "li")
+        .map(li => li.textContent.trim()).filter(Boolean);
+      if(lis.length) return lis.join(", ");
+    }
+    return "";
+  }
+  function setArray(doc, descs, prefix, uri, name, value, kind){
+    const items = (value || "").split(",").map(s => s.trim()).filter(Boolean);
+    let target = null, child = null;
+    for(const d of descs){ const c = findChildEl(d, uri, name); if(c){ target = d; child = c; break; } }
+    if(!items.length){ if(child) target.removeChild(child); return; }
+    if(!target){
+      target = ensureDescription(doc, descs);
+      if(!target) throw new Error("Could not find rdf:RDF to attach metadata to.");
+    }
+    if(!child){
+      ensureNS(target, prefix, uri);
+      child = doc.createElementNS(uri, prefix + ":" + name);
+      target.appendChild(child);
+    } else {
+      while(child.firstChild) child.removeChild(child.firstChild);
+    }
+    const container = doc.createElementNS(NS.rdf, "rdf:" + kind);
+    for(const it of items){
+      const li = doc.createElementNS(NS.rdf, "rdf:li");
+      li.textContent = it;
+      container.appendChild(li);
+    }
+    child.appendChild(container);
+  }
+
+  function getFieldValue(descs, f){
+    if(f.kind === "langalt") return getLangAlt(descs, f.uri, f.name);
+    if(f.kind === "seq") return getArray(descs, f.uri, f.name);
+    if(f.kind === "bag") return getArray(descs, f.uri, f.name);
+    return getSimple(descs, f.uri, f.name);
+  }
+  function setFieldValue(doc, descs, f, value){
+    if(f.kind === "langalt") return setLangAlt(doc, descs, f.ns, f.uri, f.name, value);
+    if(f.kind === "seq") return setArray(doc, descs, f.ns, f.uri, f.name, value, "Seq");
+    if(f.kind === "bag") return setArray(doc, descs, f.ns, f.uri, f.name, value, "Bag");
+    return setSimple(doc, descs, f.ns, f.uri, f.name, value);
+  }
+
+  function qnameFor(prefix, local){ return prefix ? prefix + ":" + local : local; }
+  function summarizeElement(el){
+    const container = el.firstElementChild;
+    if(container && container.namespaceURI === NS.rdf &&
+       (container.localName === "Alt" || container.localName === "Bag" || container.localName === "Seq")){
+      const lis = Array.from(container.children).filter(c => c.localName === "li").map(li => li.textContent.trim());
+      return lis.join(", ");
+    }
+    return el.textContent.trim().slice(0, 200);
+  }
+  function describeOtherProperties(descs){
+    const covered = new Set(FIELDS.map(f => f.uri + "|" + f.name));
+    const out = [];
+    for(const d of descs){
+      for(const attr of Array.from(d.attributes)){
+        if(attr.namespaceURI === NS.xmlns || attr.name === "xmlns") continue;
+        if(attr.namespaceURI === NS.rdf && attr.localName === "about") continue;
+        const key = attr.namespaceURI + "|" + attr.localName;
+        if(covered.has(key)) continue;
+        out.push({ qname: qnameFor(attr.prefix, attr.localName), value: attr.value });
+      }
+      for(const child of Array.from(d.children)){
+        const key = child.namespaceURI + "|" + child.localName;
+        if(covered.has(key)) continue;
+        out.push({ qname: qnameFor(child.prefix, child.localName), value: summarizeElement(child) });
+      }
+    }
+    return out;
+  }
+
+  function buildFreshXmpPacket(){
+    return '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n' +
+      '<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="xmp_editor.html">\n' +
+      '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n' +
+      '<rdf:Description rdf:about=""></rdf:Description>\n' +
+      '</rdf:RDF>\n' +
+      '</x:xmpmeta>\n' +
+      '<?xpacket end="w"?>';
+  }
+
+  // ============================================================
+  // JPEG container scanning — locate the XMP APP1 segment
+  // ============================================================
+  const JPEG_XMP_ID = new TextEncoder().encode("http://ns.adobe.com/xap/1.0/\0");
+
+  function findJpegXmpSegment(bytes){
+    if(bytes.length < 4 || bytes[0] !== 0xFF || bytes[1] !== 0xD8) return { insertionPoint: 2 };
+    let pos = 2;
+    let insertionPoint = 2;
+    let inHeaderRun = true;
+    while(pos + 4 <= bytes.length){
+      if(bytes[pos] !== 0xFF){ pos++; continue; }
+      const marker = bytes[pos + 1];
+      if(marker === 0xFF){ pos++; continue; } // fill byte
+      if(marker === 0xD8 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD7)){
+        pos += 2; continue; // standalone markers, no payload
+      }
+      if(marker === 0xDA || marker === 0xD9) break; // start of scan / EOI — metadata section is over
+      if(pos + 4 > bytes.length) break;
+      const length = (bytes[pos+2] << 8) | bytes[pos+3]; // includes the 2 length bytes themselves
+      const segStart = pos;
+      const segEnd = pos + 2 + length;
+      if(inHeaderRun && marker >= 0xE0 && marker <= 0xEF){
+        insertionPoint = segEnd;
+      } else {
+        inHeaderRun = false;
+      }
+      if(marker === 0xE1 && length >= 2 + JPEG_XMP_ID.length){
+        const s = pos + 4;
+        let matches = true;
+        for(let i = 0; i < JPEG_XMP_ID.length; i++){
+          if(bytes[s+i] !== JPEG_XMP_ID[i]){ matches = false; break; }
+        }
+        if(matches){
+          return { segStart, segEnd, payloadStart: s + JPEG_XMP_ID.length, payloadEnd: segEnd, insertionPoint };
+        }
+      }
+      pos = segEnd;
+    }
+    return { insertionPoint };
+  }
+
+  function buildJpegNewXmpSegment(xmpText){
+    const textBytes = new TextEncoder().encode(xmpText);
+    const payloadLen = JPEG_XMP_ID.length + textBytes.length;
+    if(payloadLen + 2 > 0xFFFF){
+      throw new Error("This XMP packet is too large to embed in a single JPEG segment (max ~64 KB).");
+    }
+    const seg = new Uint8Array(4 + payloadLen);
+    seg[0] = 0xFF; seg[1] = 0xE1;
+    new DataView(seg.buffer).setUint16(2, payloadLen + 2, false);
+    seg.set(JPEG_XMP_ID, 4);
+    seg.set(textBytes, 4 + JPEG_XMP_ID.length);
+    return seg;
+  }
+
+  function buildJpegWithXmp(bytes, xmpText, info){
+    const parts = [];
+    if(info.segStart != null){
+      parts.push(bytes.subarray(0, info.segStart));
+      if(xmpText) parts.push(buildJpegNewXmpSegment(xmpText));
+      parts.push(bytes.subarray(info.segEnd));
+    } else {
+      parts.push(bytes.subarray(0, info.insertionPoint));
+      if(xmpText) parts.push(buildJpegNewXmpSegment(xmpText));
+      parts.push(bytes.subarray(info.insertionPoint));
+    }
+    return concatUint8Arrays(parts);
+  }
+
+  // ============================================================
+  // PNG container scanning — locate the XMP iTXt chunk
+  // ============================================================
+  function parseITXt(data){
+    const nul1 = data.indexOf(0);
+    if(nul1 === -1 || nul1 + 3 > data.length) return null;
+    let keyword = "";
+    for(let i = 0; i < nul1; i++) keyword += String.fromCharCode(data[i]);
+    const compFlag = data[nul1 + 1];
+    const nul2 = data.indexOf(0, nul1 + 3);
+    if(nul2 === -1) return null;
+    const nul3 = data.indexOf(0, nul2 + 1);
+    if(nul3 === -1) return null;
+    return { keyword, compressed: compFlag !== 0, textBytes: data.subarray(nul3 + 1) };
+  }
+
+  function findPngXmpChunk(bytes){
+    if(bytes.length < 8) return { insertionPoint: 8 };
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let pos = 8;
+    while(pos + 8 <= bytes.length){
+      const len = view.getUint32(pos, false);
+      const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7]);
+      const dataStart = pos + 8;
+      const dataEnd = dataStart + len;
+      const chunkEnd = dataEnd + 4;
+      if(chunkEnd > bytes.length) break;
+      if(type === "iTXt"){
+        const parsed = parseITXt(bytes.subarray(dataStart, dataEnd));
+        if(parsed && parsed.keyword === "XML:com.adobe.xmp"){
+          return { chunkStart: pos, chunkEnd, compressed: parsed.compressed, textBytes: parsed.textBytes, insertionPoint: pos };
+        }
+      }
+      if(type === "IDAT" || type === "IEND") return { insertionPoint: pos };
+      pos = chunkEnd;
+    }
+    return { insertionPoint: pos };
+  }
+
+  let crcTable = null;
+  function crc32(bytes){
+    if(!crcTable){
+      crcTable = new Uint32Array(256);
+      for(let n=0; n<256; n++){
+        let c = n;
+        for(let k=0; k<8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        crcTable[n] = c >>> 0;
+      }
+    }
+    let c = 0xFFFFFFFF;
+    for(let i=0; i<bytes.length; i++) c = crcTable[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function buildPngNewXmpChunk(xmpText){
+    const kwBytes = new TextEncoder().encode("XML:com.adobe.xmp");
+    const textBytes = new TextEncoder().encode(xmpText);
+    // keyword, NUL, compression flag(0), compression method(0), lang tag(empty), NUL, translated keyword(empty), NUL, text
+    const data = concatUint8Arrays([kwBytes, new Uint8Array(5), textBytes]);
+    const typeBytes = new TextEncoder().encode("iTXt");
+    const crcInput = concatUint8Arrays([typeBytes, data]);
+    const chunk = new Uint8Array(4 + 4 + data.length + 4);
+    const dv = new DataView(chunk.buffer);
+    dv.setUint32(0, data.length, false);
+    chunk.set(typeBytes, 4);
+    chunk.set(data, 8);
+    dv.setUint32(8 + data.length, crc32(crcInput), false);
+    return chunk;
+  }
+
+  function buildPngWithXmp(bytes, xmpText, info){
+    const parts = [];
+    if(info.chunkStart != null){
+      parts.push(bytes.subarray(0, info.chunkStart));
+      if(xmpText) parts.push(buildPngNewXmpChunk(xmpText));
+      parts.push(bytes.subarray(info.chunkEnd));
+    } else {
+      parts.push(bytes.subarray(0, info.insertionPoint));
+      if(xmpText) parts.push(buildPngNewXmpChunk(xmpText));
+      parts.push(bytes.subarray(info.insertionPoint));
+    }
+    return concatUint8Arrays(parts);
+  }
+
+  async function inflateZlib(bytes){
+    if(typeof DecompressionStream === "undefined") throw new Error("unsupported");
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  function concatUint8Arrays(parts){
+    let total = 0;
+    for(const p of parts) total += p.length;
+    const out = new Uint8Array(total);
+    let off = 0;
+    for(const p of parts){ out.set(p, off); off += p.length; }
+    return out;
+  }
+
+  function buildOutputName(originalName){
+    const dot = originalName.lastIndexOf(".");
+    if(dot === -1) return originalName + "_XMPEDIT";
+    return originalName.slice(0, dot) + "_XMPEDIT" + originalName.slice(dot);
+  }
+  const MIME_MAP = { jpg:"image/jpeg", jpeg:"image/jpeg", png:"image/png" };
+  function guessMime(name){
+    const ext = name.split(".").pop().toLowerCase();
+    return MIME_MAP[ext] || "application/octet-stream";
+  }
+  function formatBytes(n){
+    if(n === 1) return "1 byte";
+    if(n < 1024) return n + " bytes";
+    return (n/1024).toFixed(1) + " KB";
+  }
+
+  // ============================================================
+  // UI wiring
+  // ============================================================
+  const previewImg = document.getElementById("previewImg");
+  const previewScroll = document.getElementById("previewScroll");
+  const emptyState = document.getElementById("emptyState");
+  const dimsLabel = document.getElementById("dimsLabel");
+  const xmpStatusLabel = document.getElementById("xmpStatusLabel");
+  const downloadReadout = document.getElementById("downloadReadout");
+  const btnDownload = document.getElementById("btnDownload");
+  const btnOpenImage = document.getElementById("btnOpenImage");
+  const fileInput = document.getElementById("f_imageFile");
+  const xmpRaw = document.getElementById("xmpRaw");
+  const rawValidity = document.getElementById("rawValidity");
+  const otherProps = document.getElementById("otherProps");
+  const btnResetXmp = document.getElementById("btnResetXmp");
+  const btnRemoveXmp = document.getElementById("btnRemoveXmp");
+
+  const state = { bytes:null, fileName:null, format:null, info:null, hadXmp:false, originalXmpText:"" };
+
+  function setEditingEnabled(enabled){
+    for(const f of FIELDS) document.getElementById(f.id).disabled = !enabled;
+    xmpRaw.disabled = !enabled;
+    btnResetXmp.disabled = !enabled;
+    btnRemoveXmp.disabled = !enabled;
+  }
+
+  function refreshRawValidity(){
+    const text = xmpRaw.value;
+    if(!text.trim()){
+      rawValidity.textContent = "Empty — no XMP will be written";
+      rawValidity.className = "valid-note";
+      return;
+    }
+    const { doc, error } = parseXmpXml(text);
+    if(doc){
+      rawValidity.textContent = "Valid XML";
+      rawValidity.className = "valid-note ok";
+    } else {
+      rawValidity.textContent = "Invalid XML: " + error;
+      rawValidity.className = "valid-note bad";
+    }
+  }
+
+  function updateStatusAndReadouts(){
+    if(!state.bytes){
+      dimsLabel.textContent = "No image loaded";
+      xmpStatusLabel.textContent = "";
+      downloadReadout.textContent = "Open an image to get started.";
+      return;
+    }
+    if(state.format === "unknown"){
+      xmpStatusLabel.textContent = "Unsupported format";
+      downloadReadout.textContent = state.fileName + "\nOnly JPEG and PNG are supported for XMP editing.";
+      return;
+    }
+    const bytesLen = new TextEncoder().encode(xmpRaw.value || "").length;
+    xmpStatusLabel.textContent = state.hadXmp
+      ? `XMP found — ${formatBytes(bytesLen)}`
+      : (xmpRaw.value.trim() ? "No XMP found — new packet ready" : "No XMP found");
+    const outName = buildOutputName(state.fileName);
+    let msg = `${state.fileName} → ${outName}`;
+    if(!xmpRaw.value.trim()){
+      msg += state.hadXmp ? "\nXMP metadata will be removed." : "\nNo XMP metadata will be written.";
+    } else {
+      msg += `\n${formatBytes(bytesLen)} of XMP will be ${state.hadXmp ? "updated" : "added"}.`;
+    }
+    downloadReadout.textContent = msg;
+  }
+
+  function renderOtherProps(descs){
+    const props = descs ? describeOtherProperties(descs) : [];
+    if(!props.length){
+      otherProps.textContent = state.bytes ? "None found." : "Open an image to see additional properties here.";
+      return;
+    }
+    otherProps.textContent = props.map(p => `${p.qname}: ${p.value || "(empty)"}`).join("\n");
+  }
+
+  function populateFieldsFromXml(text){
+    const { doc } = parseXmpXml(text || "");
+    const descs = doc ? getAllDescriptions(doc) : [];
+    for(const f of FIELDS){
+      document.getElementById(f.id).value = getFieldValue(descs, f);
+    }
+    renderOtherProps(descs);
+  }
+
+  function setRawError(msg){
+    rawValidity.textContent = msg;
+    rawValidity.className = "valid-note bad";
+  }
+
+  function applyFieldChange(f, el){
+    const { doc, error } = parseXmpXml(xmpRaw.value);
+    if(!doc){
+      setRawError("Fix the raw XML before editing fields: " + error);
+      return;
+    }
+    try{
+      const descs = getAllDescriptions(doc);
+      setFieldValue(doc, descs, f, el.value);
+      xmpRaw.value = serializeXmp(doc);
+      refreshRawValidity();
+      renderOtherProps(getAllDescriptions(doc));
+    }catch(e){
+      setRawError(e.message);
+    }
+    updateStatusAndReadouts();
+  }
+
+  for(const f of FIELDS){
+    document.getElementById(f.id).addEventListener("change", () => applyFieldChange(f, document.getElementById(f.id)));
+  }
+
+  xmpRaw.addEventListener("input", () => { refreshRawValidity(); updateStatusAndReadouts(); });
+  xmpRaw.addEventListener("blur", () => populateFieldsFromXml(xmpRaw.value));
+
+  btnResetXmp.addEventListener("click", () => {
+    xmpRaw.value = state.originalXmpText;
+    refreshRawValidity();
+    populateFieldsFromXml(xmpRaw.value);
+    updateStatusAndReadouts();
+  });
+  btnRemoveXmp.addEventListener("click", () => {
+    xmpRaw.value = "";
+    refreshRawValidity();
+    populateFieldsFromXml("");
+    updateStatusAndReadouts();
+  });
+
+  async function loadImageFile(file){
+    if(!file || !file.type.startsWith("image/")) return;
+    let buf;
+    try{ buf = await file.arrayBuffer(); }
+    catch(e){ dimsLabel.textContent = "Couldn't read that file."; return; }
+
+    const bytes = new Uint8Array(buf);
+    state.bytes = bytes;
+    state.fileName = file.name;
+
+    let format = "unknown";
+    if(bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xD8) format = "jpeg";
+    else if(bytes.length >= 8 && bytes[0]===0x89 && bytes[1]===0x50 && bytes[2]===0x4E && bytes[3]===0x47) format = "png";
+    state.format = format;
+
+    let xmpText = null, info = null, decompressWarning = null;
+
+    if(format === "jpeg"){
+      info = findJpegXmpSegment(bytes);
+      if(info.segStart != null){
+        xmpText = new TextDecoder("utf-8").decode(bytes.subarray(info.payloadStart, info.payloadEnd));
+      }
+    } else if(format === "png"){
+      info = findPngXmpChunk(bytes);
+      if(info.chunkStart != null){
+        if(info.compressed){
+          try{
+            const inflated = await inflateZlib(info.textBytes);
+            xmpText = new TextDecoder("utf-8").decode(inflated);
+          }catch(e){
+            xmpText = null; // leave empty; user can still remove/download
+            decompressWarning = "This PNG's XMP is stored compressed and this browser could not decompress it. You can still remove it, but not view or edit its contents.";
+          }
+        } else {
+          xmpText = new TextDecoder("utf-8").decode(info.textBytes);
+        }
+      }
+    }
+    state.info = info;
+    if(format === "jpeg") state.hadXmp = info.segStart != null;
+    else if(format === "png") state.hadXmp = info.chunkStart != null;
+    else state.hadXmp = false;
+
+    if(format !== "unknown" && !state.hadXmp){
+      xmpText = buildFreshXmpPacket();
+    }
+    if(decompressWarning) xmpText = "";
+
+    state.originalXmpText = xmpText || "";
+    xmpRaw.value = state.originalXmpText;
+
+    setEditingEnabled(format !== "unknown");
+    if(format !== "unknown"){
+      refreshRawValidity();
+      populateFieldsFromXml(xmpRaw.value);
+      if(decompressWarning) setRawError(decompressWarning);
+    } else {
+      xmpRaw.value = "";
+      populateFieldsFromXml("");
+      rawValidity.textContent = "";
+      rawValidity.className = "valid-note";
+    }
+
+    const blobUrl = URL.createObjectURL(file);
+    previewImg.onload = () => {
+      dimsLabel.textContent = `${file.name} — ${previewImg.naturalWidth}×${previewImg.naturalHeight}px`;
+    };
+    previewImg.src = blobUrl;
+    previewImg.classList.remove("hidden");
+    emptyState.style.display = "none";
+    dimsLabel.textContent = file.name;
+
+    updateStatusAndReadouts();
+    btnDownload.disabled = (format === "unknown");
+  }
+
+  btnOpenImage.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if(fileInput.files && fileInput.files[0]) loadImageFile(fileInput.files[0]);
+    fileInput.value = "";
+  });
+
+  ["dragover", "dragenter"].forEach(evt => {
+    previewScroll.addEventListener(evt, (e) => { e.preventDefault(); previewScroll.classList.add("dragover"); });
+  });
+  ["dragleave", "dragend"].forEach(evt => {
+    previewScroll.addEventListener(evt, () => previewScroll.classList.remove("dragover"));
+  });
+  previewScroll.addEventListener("drop", (e) => {
+    e.preventDefault();
+    previewScroll.classList.remove("dragover");
+    if(e.dataTransfer.files && e.dataTransfer.files[0]) loadImageFile(e.dataTransfer.files[0]);
+  });
+
+  btnDownload.addEventListener("click", () => {
+    if(!state.bytes || state.format === "unknown") return;
+
+    let xmpText = xmpRaw.value;
+    if(xmpText.trim()){
+      const { doc, error } = parseXmpXml(xmpText);
+      if(!doc){
+        setRawError("Cannot save: the raw XMP XML is not valid — " + error);
+        return;
+      }
+    } else {
+      xmpText = null;
+    }
+
+    let outBytes;
+    try{
+      if(state.format === "jpeg") outBytes = buildJpegWithXmp(state.bytes, xmpText, state.info);
+      else outBytes = buildPngWithXmp(state.bytes, xmpText, state.info);
+    }catch(e){
+      setRawError("Could not save: " + e.message);
+      return;
+    }
+
+    const blob = new Blob([outBytes], { type: guessMime(state.fileName) });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = buildOutputName(state.fileName);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+})();
+</script>
+</body>
+</html>
